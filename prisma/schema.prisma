@@ -1,0 +1,32 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+model Reservation {
+  id           String    @id @default(cuid())
+  source       String    // "naver", "spacecloud", "manual"
+  customerName String?
+  startTime    DateTime
+  endTime      DateTime
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  notified     Boolean   @default(false) // 예약 2시간 전 알림 발송 여부
+  price        Int       @default(0)     // 매출 정보
+
+  usageLog     UsageLog?
+}
+
+model UsageLog {
+  id            String      @id @default(cuid())
+  reservationId String      @unique
+  reservation   Reservation @relation(fields: [reservationId], references: [id])
+  headCount     Int         @default(0)
+  coffeeCount   Int         @default(0)
+  purpose       String?     // "스터디", "회의", "업무", "파티" 등
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+}
