@@ -17,7 +17,9 @@ model Reservation {
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
   notified     Boolean   @default(false) // 예약 2시간 전 알림 발송 여부
-  price        Int       @default(0)     // 매출 정보
+  price        Int       @default(0)     // 최종 매출액 (쿠폰 할인 적용 후)
+  discount     Int       @default(0)     // 사용한 쿠폰/할인 금액 (원가 - 최종가)
+  status       String    @default("CONFIRMED") // "CONFIRMED" | "CANCELLED"
   emailId      String?   @unique
 
   usageLog     UsageLog?

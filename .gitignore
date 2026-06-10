@@ -10,6 +10,14 @@ coverage/
 # Next.js  
 .next/  
 next-env.d.ts  
-# Database  
-*.db  
-*.db-journal 
+# Database
+*.db
+*.db-journal
+
+# Build artifacts
+tsconfig.tsbuildinfo
+
+# 로컬 디버그/개인정보 파일 (고객 메일 원문 등 - 절대 커밋 금지)
+email_dump.txt
+fetch-naver-email.js
+

@@ -20,6 +20,8 @@ interface Reservation {
   startTime: string;
   endTime: string;
   price: number;
+  discount: number;
+  status: string;
   usageLog: UsageLog | null;
 }
 
@@ -193,7 +195,7 @@ export default function CalendarPage() {
   };
 
   return (
-    <div className="p-4 space-y-6 h-full flex flex-col pb-24">
+    <div className="p-4 md:p-8 space-y-6 pb-24 max-w-7xl mx-auto w-full">
       <header className="pt-8 pb-4 flex justify-between items-center">
         <div>
           <h1 className="text-2xl font-bold tracking-tight text-slate-900">통합 캘린더</h1>
@@ -249,6 +251,8 @@ export default function CalendarPage() {
         ))}
       </div>
 
+      {/* 데스크톱에서는 달력과 일정 목록을 좌우로 배치 */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
       {/* Calendar Grid Section */}
       <section className="bg-white rounded-2xl shadow-sm border border-slate-100 p-4 flex flex-col">
         {/* Calendar Header Nav */}
@@ -314,7 +318,8 @@ export default function CalendarPage() {
                 {/* Dots container for day's reservations */}
                 <div className="flex gap-0.5 justify-center h-2 mt-1">
                   {dayReservations.map((res) => {
-                    const dotClass = 
+                    const dotClass =
+                      res.status === "CANCELLED" ? "bg-slate-300" :
                       res.source === "naver" ? "bg-green-500" :
                       res.source === "spacecloud" ? "bg-indigo-500" : "bg-amber-500";
                     return (
@@ -355,21 +360,30 @@ export default function CalendarPage() {
               const start = new Date(res.startTime);
               const end = new Date(res.endTime);
               const formatTime = (d: Date) => d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
+              const isCancelled = res.status === "CANCELLED";
 
               return (
                 <div
                   key={res.id}
-                  className="p-4 bg-slate-50 rounded-xl border border-slate-100 flex justify-between items-start gap-2"
+                  className={cn(
+                    "p-4 rounded-xl border flex justify-between items-start gap-2",
+                    isCancelled ? "bg-slate-100 border-slate-200" : "bg-slate-50 border-slate-100"
+                  )}
                 >
                   <div className="space-y-2 flex-1">
                     <div className="flex items-center gap-1.5 flex-wrap">
+                      {isCancelled && (
+                        <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-slate-200 text-slate-600">
+                          🚫 취소됨
+                        </span>
+                      )}
                       <span className={cn("px-1.5 py-0.5 rounded text-[10px] font-semibold", getSourceBadgeStyle(res.source))}>
                         {getSourceDisplay(res.source)}
                       </span>
                       <span className={cn("px-1.5 py-0.5 rounded text-[10px] font-semibold", getRoomBadgeStyle(res.roomName))}>
                         {res.roomName}
                       </span>
-                      <strong className="text-slate-900 text-sm">{res.customerName}</strong>
+                      <strong className={cn("text-sm", isCancelled ? "text-slate-500 line-through" : "text-slate-900")}>{res.customerName}</strong>
                     </div>
 
                     <div className="grid grid-cols-2 gap-y-1 gap-x-4 text-xs text-slate-500">
@@ -384,7 +398,12 @@ export default function CalendarPage() {
                       {res.price > 0 && (
                         <p className="flex items-center gap-1 text-slate-700">
                           <Wallet className="w-3.5 h-3.5 text-slate-400" />
-                          <span>요금: <strong className="text-slate-800">{res.price.toLocaleString()}원</strong></span>
+                          <span>{isCancelled ? "수수료" : "요금"}: <strong className="text-slate-800">{res.price.toLocaleString()}원</strong></span>
+                        </p>
+                      )}
+                      {!isCancelled && res.discount > 0 && (
+                        <p className="flex items-center gap-1 text-rose-600">
+                          <span>🎟️ 쿠폰 사용: -{res.discount.toLocaleString()}원</span>
                         </p>
                       )}
                     </div>
@@ -403,6 +422,7 @@ export default function CalendarPage() {
           )}
         </div>
       </section>
+      </div>
 
       {/* Manual Booking Modal */}
       {isModalOpen && (

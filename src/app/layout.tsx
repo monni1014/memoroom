@@ -24,7 +24,7 @@ export default function RootLayout({
     >
       <body className="min-h-full flex bg-slate-50 text-slate-900">
         <SideNavSSRWrapper />
-        <main className="flex-1 ml-20 md:ml-64 h-screen overflow-y-auto">
+        <main className="flex-1 w-full md:ml-64 h-screen overflow-y-auto">
           {children}
         </main>
       </body>

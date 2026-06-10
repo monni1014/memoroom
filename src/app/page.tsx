@@ -68,7 +68,7 @@ export default async function DashboardPage() {
   };
 
   return (
-    <div className="p-4 space-y-6 pb-20">
+    <div className="p-4 md:p-8 space-y-6 pb-20 max-w-7xl mx-auto w-full">
       <header className="pt-8 pb-4 flex justify-between items-center">
         <div>
           <h1 className="text-2xl font-bold tracking-tight text-slate-900">
@@ -80,7 +80,7 @@ export default async function DashboardPage() {
       </header>
 
       {/* Summary Cards */}
-      <section className="grid grid-cols-2 gap-4">
+      <section className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-100 flex flex-col items-center justify-center space-y-2">
           <div className="p-3 bg-indigo-50 rounded-full text-indigo-600">
             <Calendar className="w-6 h-6" />
@@ -123,18 +123,20 @@ export default async function DashboardPage() {
           <span className="text-xs text-slate-400">최근 날짜순</span>
         </div>
         
-        <div className="space-y-3">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
           {futureReservations.length === 0 ? (
-            <div className="text-center py-8 bg-slate-50 rounded-2xl border border-dashed border-slate-200 text-slate-400 text-sm">
+            <div className="lg:col-span-2 text-center py-8 bg-slate-50 rounded-2xl border border-dashed border-slate-200 text-slate-400 text-sm">
               등록된 예약 일정이 없습니다.<br />
               <span className="text-xs">캘린더의 초록색 🔄 버튼으로 메일을 동기화해 보세요!</span>
             </div>
           ) : (
             futureReservations.map((res) => {
-              const borderColors = 
-                res.source === "naver" ? "border-l-green-500" :
-                res.source === "spacecloud" ? "border-l-indigo-500" : "border-l-amber-500";
-              const labelColors = 
+              const isCancelled = res.status === "CANCELLED";
+              const borderColors = isCancelled
+                ? "border-l-slate-300"
+                : res.source === "naver" ? "border-l-green-500" :
+                  res.source === "spacecloud" ? "border-l-indigo-500" : "border-l-amber-500";
+              const labelColors =
                 res.source === "naver" ? "bg-green-50 hover:bg-green-100 text-green-700" :
                 res.source === "spacecloud" ? "bg-indigo-50 hover:bg-indigo-100 text-indigo-700" : "bg-amber-50 hover:bg-amber-100 text-amber-700";
               const roomColors =
@@ -142,30 +144,48 @@ export default async function DashboardPage() {
                 res.roomName === "머무룸2" ? "bg-purple-50 text-purple-700" : "bg-teal-50 text-teal-700";
 
               return (
-                <div 
-                  key={res.id} 
-                  className={`bg-white p-4 rounded-xl shadow-[0_2px_8px_rgba(0,0,0,0.02)] border border-slate-100 flex justify-between items-center border-l-4 ${borderColors}`}
+                <div
+                  key={res.id}
+                  className={`p-4 rounded-xl shadow-[0_2px_8px_rgba(0,0,0,0.02)] border flex justify-between items-center border-l-4 ${borderColors} ${
+                    isCancelled ? "bg-slate-100 border-slate-200" : "bg-white border-slate-100"
+                  }`}
                 >
                   <div>
-                    <p className="text-sm font-semibold text-slate-900">
+                    <p className={`text-sm font-semibold ${isCancelled ? "text-slate-400 line-through" : "text-slate-900"}`}>
                       {formatTimeRange(new Date(res.startTime), new Date(res.endTime))}
                     </p>
                     <p className="text-xs text-slate-500 mt-1.5 flex items-center gap-1.5 flex-wrap">
+                      {isCancelled && (
+                        <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-slate-200 text-slate-600">
+                          🚫 취소됨
+                        </span>
+                      )}
                       <span className={`px-1.5 py-0.5 rounded text-[10px] font-semibold ${labelColors}`}>
                         {getSourceDisplay(res.source)}
                       </span>
                       <span className={`px-1.5 py-0.5 rounded text-[10px] font-semibold ${roomColors}`}>
                         {res.roomName}
                       </span>
-                      <strong className="text-slate-800">{res.customerName}</strong>
+                      <strong className={isCancelled ? "text-slate-500" : "text-slate-800"}>{res.customerName}</strong>
                       <span>· {res.usageLog?.headCount || 0}명 ({res.usageLog?.purpose || "기타"})</span>
                       {res.price > 0 && (
-                        <span className="text-emerald-600 font-medium">· {res.price.toLocaleString()}원</span>
+                        <span className={`font-medium ${isCancelled ? "text-slate-500" : "text-emerald-600"}`}>
+                          · {res.price.toLocaleString()}원{isCancelled ? " (수수료)" : ""}
+                        </span>
+                      )}
+                      {!isCancelled && res.discount > 0 && (
+                        <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-rose-50 text-rose-600">
+                          🎟️ 쿠폰 -{res.discount.toLocaleString()}원
+                        </span>
                       )}
                     </p>
                   </div>
-                  <span className="px-2.5 py-1 bg-slate-50 text-slate-600 text-xs font-semibold rounded-lg border border-slate-100">
-                    {new Date(res.endTime) < new Date() ? "완료" : "대기중"}
+                  <span className={`px-2.5 py-1 text-xs font-semibold rounded-lg border ${
+                    isCancelled
+                      ? "bg-slate-200 text-slate-500 border-slate-200"
+                      : "bg-slate-50 text-slate-600 border-slate-100"
+                  }`}>
+                    {isCancelled ? "취소" : new Date(res.endTime) < new Date() ? "완료" : "대기중"}
                   </span>
                 </div>
               );

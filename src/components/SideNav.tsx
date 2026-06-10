@@ -16,15 +16,24 @@ export function SideNav() {
   const pathname = usePathname();
 
   return (
-    <nav className="fixed left-0 top-0 h-full w-20 md:w-64 bg-white border-r border-slate-200 flex flex-col z-50 transition-all duration-300">
-      <div className="flex items-center justify-center md:justify-start h-16 px-0 md:px-6 border-b border-slate-100">
+    <nav
+      className={cn(
+        "fixed z-50 bg-white border-slate-200 flex",
+        // 모바일: 하단 탭바 (가로)
+        "bottom-0 left-0 right-0 h-16 border-t flex-row",
+        // 데스크톱(md+): 좌측 사이드바 (세로)
+        "md:top-0 md:right-auto md:h-full md:w-64 md:border-t-0 md:border-r md:flex-col"
+      )}
+    >
+      {/* 로고 헤더 — 데스크톱 사이드바에서만 표시 */}
+      <div className="hidden md:flex items-center h-16 px-6 border-b border-slate-100">
         <div className="flex items-center gap-3 text-indigo-600">
           <Building2 className="w-8 h-8" />
-          <span className="font-bold text-xl hidden md:block text-slate-900 tracking-tight">머무룸 DX</span>
+          <span className="font-bold text-xl text-slate-900 tracking-tight">머무룸 DX</span>
         </div>
       </div>
 
-      <div className="flex-1 py-6 px-3 flex flex-col gap-2">
+      <div className="flex-1 flex flex-row md:flex-col justify-around md:justify-start md:py-6 md:px-3 md:gap-2">
         {NAV_ITEMS.map((item) => {
           const isActive = pathname === item.href;
           return (
@@ -32,22 +41,22 @@ export function SideNav() {
               key={item.href}
               href={item.href}
               className={cn(
-                "flex items-center justify-center md:justify-start gap-4 px-3 py-3 rounded-xl transition-all duration-200 group",
-                isActive 
-                  ? "bg-indigo-50 text-indigo-700" 
+                "flex flex-1 md:flex-none flex-col md:flex-row items-center md:justify-start gap-1 md:gap-4 px-1 md:px-3 py-2 md:py-3 md:rounded-xl transition-all duration-200 group",
+                isActive
+                  ? "text-indigo-700 md:bg-indigo-50"
                   : "text-slate-500 hover:bg-slate-50 hover:text-slate-900"
               )}
             >
-              <item.icon 
+              <item.icon
                 className={cn(
                   "w-6 h-6 flex-shrink-0 transition-colors duration-200",
                   isActive ? "text-indigo-600" : "text-slate-400 group-hover:text-slate-600"
-                )} 
-                strokeWidth={isActive ? 2.5 : 2} 
+                )}
+                strokeWidth={isActive ? 2.5 : 2}
               />
               <span className={cn(
-                "font-medium hidden md:block text-sm",
-                isActive ? "font-semibold" : ""
+                "text-[10px] md:text-sm",
+                isActive ? "font-semibold" : "font-medium"
               )}>
                 {item.name}
               </span>

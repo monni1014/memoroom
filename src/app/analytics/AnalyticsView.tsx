@@ -104,7 +104,7 @@ export default function AnalyticsPage() {
   }
 
   return (
-    <div className="p-4 space-y-6 pb-24">
+    <div className="p-4 md:p-8 space-y-6 pb-24 max-w-5xl mx-auto w-full">
       <header className="pt-8 pb-4">
         <h1 className="text-2xl font-bold tracking-tight text-slate-900">결산 및 통계</h1>
         <p className="text-sm text-slate-500 mt-1">포스 및 예약 채널 실시간 자동 종합 레포트</p>
