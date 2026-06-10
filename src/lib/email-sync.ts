@@ -17,6 +17,10 @@ export async function syncEmails(): Promise<{ processed: number; newReservations
     logger: false, // 로깅 끄기
   });
 
+  client.on('error', (err) => {
+    console.error('[EmailSync] IMAP 클라이언트 에러 (타임아웃 등):', err.message);
+  });
+
   let processed = 0;
   let newReservations = 0;
 
