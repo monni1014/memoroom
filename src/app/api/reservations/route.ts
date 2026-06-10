@@ -23,7 +23,7 @@ export async function GET() {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { source, roomName, customerName, startTime, endTime, price, headCount, coffeeCount, purpose } = body;
+    const { source, roomName, customerName, startTime, endTime, price, headCount, coffeeCount, purpose, detail } = body;
 
     const reservation = await prisma.reservation.create({
       data: {
@@ -36,8 +36,10 @@ export async function POST(request: NextRequest) {
         usageLog: {
           create: {
             headCount: Number(headCount) || 1,
+            reservedHeadCount: Number(headCount) || 1, // 예약=실제 동일하게 시작
             coffeeCount: Number(coffeeCount) || 0,
-            purpose: purpose || "기타",
+            purpose: purpose || null,
+            detail: detail || null,
           },
         },
       },

@@ -133,8 +133,11 @@ export async function syncEmails(): Promise<{ processed: number; newReservations
             emailId: reservationData.emailId,
             usageLog: {
               create: {
+                // 실제 인원은 처음엔 예약 인원과 동일하게 두고, CCTV 관찰 후 이용현황에서 조정
                 headCount: reservationData.headCount,
-                purpose: "메일 자동 등록",
+                reservedHeadCount: reservationData.headCount,
+                // 대분류는 CCTV로 실제 이용을 관찰한 뒤 이용현황에서 입력 (그 전까진 미입력)
+                purpose: null,
               }
             }
           }

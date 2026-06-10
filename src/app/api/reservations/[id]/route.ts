@@ -8,7 +8,7 @@ export async function PATCH(
   try {
     const { id } = await context.params;
     const body = await request.json();
-    const { customerName, startTime, endTime, price, headCount, coffeeCount, purpose } = body;
+    const { customerName, startTime, endTime, price, headCount, reservedHeadCount, coffeeCount, purpose, detail } = body;
 
     // First check if reservation exists
     const existing = await prisma.reservation.findUnique({
@@ -29,21 +29,25 @@ export async function PATCH(
     if (price !== undefined) updateData.price = Number(price);
 
     // Prepare usage data update
-    if (headCount !== undefined || coffeeCount !== undefined || purpose !== undefined) {
+    if (headCount !== undefined || reservedHeadCount !== undefined || coffeeCount !== undefined || purpose !== undefined || detail !== undefined) {
       if (existing.usageLog) {
         updateData.usageLog = {
           update: {
             headCount: headCount !== undefined ? Number(headCount) : undefined,
+            reservedHeadCount: reservedHeadCount !== undefined ? Number(reservedHeadCount) : undefined,
             coffeeCount: coffeeCount !== undefined ? Number(coffeeCount) : undefined,
             purpose: purpose !== undefined ? purpose : undefined,
+            detail: detail !== undefined ? detail : undefined,
           },
         };
       } else {
         updateData.usageLog = {
           create: {
             headCount: headCount !== undefined ? Number(headCount) : 1,
+            reservedHeadCount: reservedHeadCount !== undefined ? Number(reservedHeadCount) : (headCount !== undefined ? Number(headCount) : 1),
             coffeeCount: coffeeCount !== undefined ? Number(coffeeCount) : 0,
-            purpose: purpose !== undefined ? purpose : "기타",
+            purpose: purpose !== undefined ? purpose : null,
+            detail: detail !== undefined ? detail : null,
           },
         };
       }

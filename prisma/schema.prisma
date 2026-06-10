@@ -29,9 +29,11 @@ model UsageLog {
   id            String      @id @default(cuid())
   reservationId String      @unique
   reservation   Reservation @relation(fields: [reservationId], references: [id])
-  headCount     Int         @default(0)
+  headCount         Int     @default(0)   // 실제 이용인원 (CCTV 관찰 기준, 분석의 기준값)
+  reservedHeadCount Int     @default(0)   // 예약 이용인원 (메일 자동, 플랫폼 최소인원 영향)
   coffeeCount   Int         @default(0)
-  purpose       String?     // "스터디", "회의", "업무", "파티" 등
+  purpose       String?     // 대분류(고정): 교육/보드게임/사적모임/촬영/회사회의/기타 (null=미입력)
+  detail        String?     // 세부내용(자유입력): "보험교육", "유튜브 촬영" 등
   createdAt     DateTime    @default(now())
   updatedAt     DateTime    @updatedAt
 }

@@ -4,12 +4,14 @@ import { useState, useEffect } from "react";
 import { ChevronLeft, ChevronRight, Plus, Clock, User, Trash2, X, Wallet, RefreshCw, Building2 } from "lucide-react";
 import { format, addMonths, subMonths, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isSameDay } from "date-fns";
 import { cn } from "@/lib/utils";
+import { MAJOR_CATEGORIES, UNCATEGORIZED_LABEL } from "@/lib/categories";
 
 interface UsageLog {
   id: string;
   headCount: number;
   coffeeCount: number;
   purpose: string | null;
+  detail: string | null;
 }
 
 interface Reservation {
@@ -44,7 +46,8 @@ export default function CalendarPage() {
   const [formEndTime, setFormEndTime] = useState("17:00");
   const [formPrice, setFormPrice] = useState("30000");
   const [formGuests, setFormGuests] = useState("4");
-  const [formPurpose, setFormPurpose] = useState("회의");
+  const [formPurpose, setFormPurpose] = useState(""); // 대분류
+  const [formDetail, setFormDetail] = useState(""); // 세부내용
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const fetchReservations = async () => {
@@ -64,6 +67,9 @@ export default function CalendarPage() {
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchReservations();
+    // 1분마다 화면 자동 새로고침 (서버 cron이 받아온 새 예약/취소를 반영)
+    const id = setInterval(fetchReservations, 60000);
+    return () => clearInterval(id);
   }, []);
 
   const handleSyncEmails = async () => {
@@ -124,12 +130,15 @@ export default function CalendarPage() {
           endTime: endDateTime,
           price: parseInt(formPrice, 10) || 0,
           headCount: parseInt(formGuests, 10) || 1,
-          purpose: formPurpose,
+          purpose: formPurpose || null,
+          detail: formDetail.trim() || null,
         }),
       });
 
       if (response.ok) {
         setFormName("");
+        setFormPurpose("");
+        setFormDetail("");
         setIsModalOpen(false);
         fetchReservations();
       } else {
@@ -393,7 +402,7 @@ export default function CalendarPage() {
                       </p>
                       <p className="flex items-center gap-1">
                         <User className="w-3.5 h-3.5" />
-                        <span>인원: {res.usageLog?.headCount || 1}명 ({res.usageLog?.purpose || "기타"})</span>
+                        <span>인원: {res.usageLog?.headCount || 1}명 ({res.usageLog?.purpose || UNCATEGORIZED_LABEL}{res.usageLog?.detail ? ` · ${res.usageLog.detail}` : ""})</span>
                       </p>
                       {res.price > 0 && (
                         <p className="flex items-center gap-1 text-slate-700">
@@ -527,20 +536,29 @@ export default function CalendarPage() {
                 </div>
 
                 <div className="space-y-1">
-                  <label className="text-xs font-bold text-slate-500">이용 목적</label>
+                  <label className="text-xs font-bold text-slate-500">이용 목적 (대분류)</label>
                   <select
                     value={formPurpose}
                     onChange={(e) => setFormPurpose(e.target.value)}
                     className="w-full text-sm p-2.5 rounded-xl border border-slate-200 outline-hidden focus:border-indigo-500 font-medium bg-white"
                   >
-                    <option value="회의">회의</option>
-                    <option value="스터디">스터디</option>
-                    <option value="파티">파티</option>
-                    <option value="촬영">촬영</option>
-                    <option value="세미나">세미나</option>
-                    <option value="기타">기타</option>
+                    <option value="">미입력</option>
+                    {MAJOR_CATEGORIES.map((c) => (
+                      <option key={c} value={c}>{c}</option>
+                    ))}
                   </select>
                 </div>
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-xs font-bold text-slate-500">세부내용 (선택 입력)</label>
+                <input
+                  type="text"
+                  value={formDetail}
+                  onChange={(e) => setFormDetail(e.target.value)}
+                  placeholder="예: 보험교육, 유튜브 촬영"
+                  className="w-full text-sm p-2.5 rounded-xl border border-slate-200 outline-hidden focus:border-indigo-500 font-medium"
+                />
               </div>
 
               <div className="space-y-1">

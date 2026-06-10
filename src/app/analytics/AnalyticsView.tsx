@@ -3,12 +3,14 @@
 import { useEffect, useState } from "react";
 import { PieChart, Pie, Cell, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip } from "recharts";
 import { Loader2 } from "lucide-react";
+import { UNCATEGORIZED_LABEL } from "@/lib/categories";
 
 interface UsageLog {
   id: string;
   headCount: number;
   coffeeCount: number;
   purpose: string | null;
+  detail: string | null;
 }
 
 interface Reservation {
@@ -18,6 +20,7 @@ interface Reservation {
   startTime: string;
   endTime: string;
   price: number;
+  status: string;
   usageLog: UsageLog | null;
 }
 
@@ -48,13 +51,15 @@ export default function AnalyticsPage() {
     fetchReservations();
   }, []);
 
-  // 1. Calculate PIE_DATA based on actual purposes
+  // 1. Calculate PIE_DATA based on actual purposes (취소 건은 실제 이용이 아니므로 제외)
   const purposeCounts: Record<string, number> = {};
-  reservations.forEach((res) => {
-    const purpose = res.usageLog?.purpose || "기타";
-    const headCount = res.usageLog?.headCount || 1;
-    purposeCounts[purpose] = (purposeCounts[purpose] || 0) + headCount;
-  });
+  reservations
+    .filter((res) => res.status !== "CANCELLED")
+    .forEach((res) => {
+      const purpose = res.usageLog?.purpose || UNCATEGORIZED_LABEL;
+      const headCount = res.usageLog?.headCount || 1;
+      purposeCounts[purpose] = (purposeCounts[purpose] || 0) + headCount;
+    });
 
   const pieData = Object.keys(purposeCounts).length > 0
     ? Object.entries(purposeCounts).map(([name, value]) => ({ name, value }))

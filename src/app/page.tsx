@@ -1,6 +1,8 @@
 import { Calendar, Users, Coffee, TrendingUp, RefreshCw, Building2 } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import EmailSyncButton from "./EmailSyncButton";
+import AutoRefresh from "./AutoRefresh";
+import { UNCATEGORIZED_LABEL } from "@/lib/categories";
 
 export const dynamic = "force-dynamic";
 
@@ -25,11 +27,14 @@ export default async function DashboardPage() {
   });
 
   // Calculate statistics across database
-  const allUsageLogs = await prisma.usageLog.findMany();
-  const allReservations = await prisma.reservation.findMany();
+  const allReservations = await prisma.reservation.findMany({ include: { usageLog: true } });
 
-  const totalGuests = allUsageLogs.reduce((sum, log) => sum + log.headCount, 0);
-  const totalCoffee = allUsageLogs.reduce((sum, log) => sum + log.coffeeCount, 0);
+  // 취소된 예약은 실제 이용이 아니므로 누적 이용객/커피 통계에서 제외
+  const activeReservations = allReservations.filter(r => r.status !== "CANCELLED");
+  const totalGuests = activeReservations.reduce((sum, r) => sum + (r.usageLog?.headCount ?? 0), 0);
+  const totalCoffee = activeReservations.reduce((sum, r) => sum + (r.usageLog?.coffeeCount ?? 0), 0);
+
+  // 누적 매출: 취소 건의 환불수수료도 매출이므로 전체 합산 (취소 시 price에 수수료가 들어감)
   const totalRevenue = allReservations.reduce((sum, res) => sum + res.price, 0);
 
   // Format revenue text
@@ -69,6 +74,7 @@ export default async function DashboardPage() {
 
   return (
     <div className="p-4 md:p-8 space-y-6 pb-20 max-w-7xl mx-auto w-full">
+      <AutoRefresh />
       <header className="pt-8 pb-4 flex justify-between items-center">
         <div>
           <h1 className="text-2xl font-bold tracking-tight text-slate-900">
@@ -167,7 +173,7 @@ export default async function DashboardPage() {
                         {res.roomName}
                       </span>
                       <strong className={isCancelled ? "text-slate-500" : "text-slate-800"}>{res.customerName}</strong>
-                      <span>· {res.usageLog?.headCount || 0}명 ({res.usageLog?.purpose || "기타"})</span>
+                      <span>· {res.usageLog?.headCount || 0}명 ({res.usageLog?.purpose || UNCATEGORIZED_LABEL}{res.usageLog?.detail ? ` · ${res.usageLog.detail}` : ""})</span>
                       {res.price > 0 && (
                         <span className={`font-medium ${isCancelled ? "text-slate-500" : "text-emerald-600"}`}>
                           · {res.price.toLocaleString()}원{isCancelled ? " (수수료)" : ""}

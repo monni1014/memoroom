@@ -19,10 +19,13 @@ export interface ParsedReservation {
  */
 export function parseSpaceCloudEmail(subject: string, text: string, messageId: string): ParsedReservation | null {
   try {
-    // 1. 공간 추출 (제목에서 "예약하기 1" 또는 "예약하기 2" 등)
+    // 1. 공간 추출 ("예약하기 1/2/3" - 제목 또는 본문 머리글에 등장)
+    //    스페이스클라우드는 제목이 아니라 본문 머리글("머무룸 회의실 예약하기 2의...")에
+    //    공간명이 들어오므로 subject와 text를 모두 확인한다.
+    const roomSource = `${subject} ${text}`;
     let roomName = "머무룸1";
-    if (subject.includes("예약하기 2")) roomName = "머무룸2";
-    else if (subject.includes("예약하기 3")) roomName = "머무룸3";
+    if (roomSource.includes("예약하기 2")) roomName = "머무룸2";
+    else if (roomSource.includes("예약하기 3")) roomName = "머무룸3";
 
     // 2. 예약내용 (시간) 추출: "2026/06/11 17시 - 21시"
     const timeMatch = text.match(/예약내용\s+(\d{4}\/\d{2}\/\d{2})\s+(\d+)시\s*-\s*(\d+)시/);
@@ -35,17 +38,26 @@ export function parseSpaceCloudEmail(subject: string, text: string, messageId: s
     const startTime = parse(`${dateStr} ${startHour}:00`, 'yyyy/MM/dd HH:mm', new Date());
     const endTime = parse(`${dateStr} ${endHour}:00`, 'yyyy/MM/dd HH:mm', new Date());
 
-    // 3. 인원 추출: "10명"
-    const headMatch = text.match(/이용인원\s+(\d+)명/);
+    // 3. 인원 추출: "예약인원 5명" 또는 "이용인원 10명" 둘 다 지원
+    const headMatch = text.match(/(?:예약인원|이용인원)\s+(\d+)명/);
     const headCount = headMatch ? parseInt(headMatch[1], 10) : 1;
 
-    // 4. 예약자명 추출: "이무진"
-    const nameMatch = text.match(/예약자명\s+([^\n]+)/);
+    // 4. 예약자명 추출: "양진우"
+    //    취소 메일은 "예약자명 양진우 결제예정금액 ..."처럼 뒤 필드가 같은 줄에 붙어오므로
+    //    "결제"가 나오기 전 또는 줄바꿈 전까지만 잘라낸다.
+    const nameMatch = text.match(/예약자명\s+(.+?)(?=\s*결제|\n|$)/);
     const customerName = nameMatch ? nameMatch[1].trim() : "스페이스클라우드 예약";
 
-    // 5. 금액 추출: "₩100,000"
-    const priceMatch = text.match(/결제금액\s+[^\d]*([\d,]+)/);
+    // 5. 금액 추출: "₩100,000" / 취소 메일은 "결제예정금액 ₩25,000"
+    const priceMatch = text.match(/결제(?:예정)?금액\s+[^\d]*([\d,]+)/);
     const price = priceMatch ? parseInt(priceMatch[1].replace(/,/g, ''), 10) : 0;
+
+    // 6. 취소 메일 여부 추출
+    //    참고: 스페이스클라우드 취소 메일 하단의 '결제예정금액'은 실제 환불수수료와
+    //    다를 수 있다(정확한 수수료는 '호스트센터'에서 확인해야 함). 그래서 메일값을
+    //    매출로 자동 반영하지 않는다. → 취소 시 매출은 0, 필요하면 수기 입력.
+    const isCancelled = /예약이\s*취소|취소되었습니다|취소일|취소사유/.test(text) || subject.includes("취소");
+    const refundFee = 0;
 
     return {
       source: "spacecloud",
@@ -56,6 +68,8 @@ export function parseSpaceCloudEmail(subject: string, text: string, messageId: s
       price,
       headCount,
       emailId: messageId,
+      isCancelled,
+      refundFee,
     };
   } catch (e) {
     console.error("SpaceCloud 파싱 에러:", e);

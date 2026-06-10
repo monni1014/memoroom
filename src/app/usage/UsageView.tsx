@@ -1,13 +1,16 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Check, Search, Users, Coffee, Tag, AlertCircle } from "lucide-react";
+import { Check, Search, Users, Coffee, Tag, AlertCircle, Pencil } from "lucide-react";
+import { MAJOR_CATEGORIES, SUB_CATEGORIES, UNCATEGORIZED_LABEL } from "@/lib/categories";
 
 interface UsageLog {
   id: string;
-  headCount: number;
+  headCount: number;          // 실제 이용인원
+  reservedHeadCount: number;  // 예약 이용인원
   coffeeCount: number;
   purpose: string | null;
+  detail: string | null;
 }
 
 interface Reservation {
@@ -23,9 +26,11 @@ interface Reservation {
 export default function UsagePage() {
   const [reservations, setReservations] = useState<Reservation[]>([]);
   const [selectedResId, setSelectedResId] = useState<string>("");
-  const [headCount, setHeadCount] = useState(0);
+  const [headCount, setHeadCount] = useState(0); // 실제 이용인원
+  const [reserved, setReserved] = useState(0);   // 예약 이용인원 (읽기전용)
   const [coffeeCount, setCoffeeCount] = useState(0);
-  const [selectedPurpose, setSelectedPurpose] = useState("회의");
+  const [selectedPurpose, setSelectedPurpose] = useState(""); // 대분류 ("" = 미선택)
+  const [detail, setDetail] = useState(""); // 세부내용 자유입력
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [successMsg, setSuccessMsg] = useState("");
@@ -49,8 +54,10 @@ export default function UsagePage() {
           const defaultRes = inProgress || data[0];
           setSelectedResId(defaultRes.id);
           setHeadCount(defaultRes.usageLog?.headCount || 2);
+          setReserved(defaultRes.usageLog?.reservedHeadCount ?? defaultRes.usageLog?.headCount ?? 0);
           setCoffeeCount(defaultRes.usageLog?.coffeeCount || 0);
-          setSelectedPurpose(defaultRes.usageLog?.purpose || "기타");
+          setSelectedPurpose(defaultRes.usageLog?.purpose || "");
+          setDetail(defaultRes.usageLog?.detail || "");
         }
       }
     } catch (err) {
@@ -69,9 +76,11 @@ export default function UsagePage() {
     setSelectedResId(resId);
     const found = reservations.find((r) => r.id === resId);
     if (found) {
-      setHeadCount(found.usageLog?.headCount || found.usageLog?.headCount || 2);
+      setHeadCount(found.usageLog?.headCount || 2);
+      setReserved(found.usageLog?.reservedHeadCount ?? found.usageLog?.headCount ?? 0);
       setCoffeeCount(found.usageLog?.coffeeCount || 0);
-      setSelectedPurpose(found.usageLog?.purpose || "회의");
+      setSelectedPurpose(found.usageLog?.purpose || "");
+      setDetail(found.usageLog?.detail || "");
     }
   };
 
@@ -86,9 +95,11 @@ export default function UsagePage() {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          headCount,
+          headCount,          // 실제 이용인원
+          reservedHeadCount: reserved,
           coffeeCount,
-          purpose: selectedPurpose,
+          purpose: selectedPurpose || null, // 미선택이면 null(미입력)
+          detail: detail.trim() || null,
         }),
       });
 
@@ -178,21 +189,33 @@ export default function UsagePage() {
           )}
         </div>
 
-        {/* Guest and Coffee count controllers */}
+        {/* 인원 컨트롤러: 예약(읽기전용) / 실제(스테퍼) / 추가(스테퍼) + 커피 */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          {/* 예약 이용인원 - 메일 자동, 읽기전용 */}
+          <div className="space-y-3">
+            <label className="text-sm font-semibold text-slate-700 flex items-center gap-1">
+              <Users className="w-4 h-4 text-slate-400" />
+              예약 인원 <span className="text-[10px] font-medium text-slate-400">(메일)</span>
+            </label>
+            <div className="flex items-center justify-center bg-slate-100 p-2 rounded-xl border border-slate-200 h-[56px]">
+              <span className="text-xl font-bold text-slate-500">{reserved}명</span>
+            </div>
+          </div>
+
+          {/* 실제 이용인원 - 메인 저장값 */}
           <div className="space-y-3">
             <label className="text-sm font-semibold text-slate-700 flex items-center gap-1">
               <Users className="w-4 h-4 text-indigo-500" />
-              이용 인원
+              실제 인원
             </label>
-            <div className="flex items-center justify-between bg-slate-50 p-2 rounded-xl border border-slate-200">
+            <div className="flex items-center justify-between bg-indigo-50/60 p-2 rounded-xl border border-indigo-100">
               <button
                 onClick={() => setHeadCount(Math.max(0, headCount - 1))}
                 className="w-10 h-10 rounded-lg bg-white shadow-sm flex items-center justify-center font-bold text-slate-700 text-lg hover:bg-slate-50 border border-slate-200 transition active:scale-90"
               >
                 -
               </button>
-              <span className="text-xl font-bold text-slate-900">{headCount}명</span>
+              <span className="text-xl font-bold text-indigo-700">{headCount}명</span>
               <button
                 onClick={() => setHeadCount(headCount + 1)}
                 className="w-10 h-10 rounded-lg bg-white shadow-sm flex items-center justify-center font-bold text-slate-700 text-lg hover:bg-slate-50 border border-slate-200 transition active:scale-90"
@@ -202,6 +225,30 @@ export default function UsagePage() {
             </div>
           </div>
 
+          {/* 추가 인원 - 실제 = 예약 초과분. +/- 누르면 실제 인원에 반영 */}
+          <div className="space-y-3">
+            <label className="text-sm font-semibold text-slate-700 flex items-center gap-1">
+              <Users className="w-4 h-4 text-emerald-500" />
+              추가 인원
+            </label>
+            <div className="flex items-center justify-between bg-emerald-50/60 p-2 rounded-xl border border-emerald-100">
+              <button
+                onClick={() => setHeadCount(headCount > reserved ? headCount - 1 : headCount)}
+                className="w-10 h-10 rounded-lg bg-white shadow-sm flex items-center justify-center font-bold text-slate-700 text-lg hover:bg-slate-50 border border-slate-200 transition active:scale-90"
+              >
+                -
+              </button>
+              <span className="text-xl font-bold text-emerald-700">+{Math.max(0, headCount - reserved)}명</span>
+              <button
+                onClick={() => setHeadCount(headCount + 1)}
+                className="w-10 h-10 rounded-lg bg-white shadow-sm flex items-center justify-center font-bold text-slate-700 text-lg hover:bg-slate-50 border border-slate-200 transition active:scale-90"
+              >
+                +
+              </button>
+            </div>
+          </div>
+
+          {/* 제공된 커피 */}
           <div className="space-y-3">
             <label className="text-sm font-semibold text-slate-700 flex items-center gap-1">
               <Coffee className="w-4 h-4 text-amber-500" />
@@ -225,20 +272,20 @@ export default function UsagePage() {
           </div>
         </div>
 
-        {/* Purpose selection */}
+        {/* 이용 목적 - 대분류 선택 */}
         <div className="space-y-3">
           <label className="text-sm font-semibold text-slate-700 flex items-center gap-1">
             <Tag className="w-4 h-4 text-emerald-500" />
-            이용 목적
+            이용 목적 <span className="text-xs font-medium text-slate-400">(대분류)</span>
           </label>
           <div className="grid grid-cols-3 gap-2">
-            {["스터디", "회의", "촬영", "파티", "세미나", "기타"].map((purpose) => {
+            {MAJOR_CATEGORIES.map((purpose) => {
               const isSelected = selectedPurpose === purpose;
               return (
                 <button
                   type="button"
                   key={purpose}
-                  onClick={() => setSelectedPurpose(purpose)}
+                  onClick={() => setSelectedPurpose(isSelected ? "" : purpose)}
                   className={`py-2.5 rounded-xl border text-sm font-semibold transition duration-150 active:scale-95 ${
                     isSelected
                       ? "bg-indigo-600 text-white border-indigo-600 shadow-sm"
@@ -250,6 +297,49 @@ export default function UsagePage() {
               );
             })}
           </div>
+        </div>
+
+        {/* 세부내용 - 자유 입력 */}
+        <div className="space-y-3">
+          <label className="text-sm font-semibold text-slate-700 flex items-center gap-1">
+            <Pencil className="w-4 h-4 text-sky-500" />
+            세부내용 <span className="text-xs font-medium text-slate-400">(소분류 · 선택 입력)</span>
+          </label>
+
+          {/* 대분류별 빠른선택 칩 (누르면 세부내용 자동 입력, 직접 타이핑도 가능) */}
+          {selectedPurpose && (SUB_CATEGORIES[selectedPurpose]?.length ?? 0) > 0 && (
+            <div className="flex flex-wrap gap-2">
+              {SUB_CATEGORIES[selectedPurpose].map((sub) => {
+                const active = detail === sub;
+                return (
+                  <button
+                    type="button"
+                    key={sub}
+                    onClick={() => setDetail(active ? "" : sub)}
+                    className={`px-3 py-1.5 rounded-full text-xs font-semibold border transition active:scale-95 ${
+                      active
+                        ? "bg-sky-500 text-white border-sky-500"
+                        : "bg-sky-50 text-sky-700 border-sky-100 hover:bg-sky-100"
+                    }`}
+                  >
+                    {sub}
+                  </button>
+                );
+              })}
+            </div>
+          )}
+
+          <input
+            type="text"
+            value={detail}
+            onChange={(e) => setDetail(e.target.value)}
+            placeholder={
+              selectedPurpose
+                ? "위 칩을 누르거나 직접 입력하세요 (예: 보험교육)"
+                : "대분류를 먼저 선택하면 추천 소분류가 떠요 (직접 입력도 가능)"
+            }
+            className="w-full text-sm p-3.5 rounded-xl border border-slate-200 outline-hidden focus:border-indigo-500 font-medium text-slate-800"
+          />
         </div>
 
         {/* Submit action */}
@@ -292,9 +382,17 @@ export default function UsagePage() {
                       {parsedDateStr} ({log.customerName || "미지정"})
                     </p>
                     <p className="text-xs text-slate-500 font-semibold">
-                      인원 <span className="text-slate-800">{log.usageLog?.headCount || 1}명</span> · 커피{" "}
+                      실제 <span className="text-slate-800">{log.usageLog?.headCount || 1}명</span>
+                      {(() => {
+                        const r = log.usageLog?.reservedHeadCount ?? 0;
+                        const h = log.usageLog?.headCount ?? 0;
+                        return r > 0 && r !== h ? <span className="text-slate-400 font-medium"> (예약 {r})</span> : null;
+                      })()} · 커피{" "}
                       <span className="text-slate-800">{log.usageLog?.coffeeCount || 0}잔</span> · 목적{" "}
-                      <span className="text-indigo-600 font-bold">#{log.usageLog?.purpose || "기타"}</span>
+                      <span className="text-indigo-600 font-bold">#{log.usageLog?.purpose || UNCATEGORIZED_LABEL}</span>
+                      {log.usageLog?.detail && (
+                        <span className="text-slate-400 font-medium"> · {log.usageLog.detail}</span>
+                      )}
                     </p>
                   </div>
                   <span className="text-[10px] font-bold text-slate-400">
