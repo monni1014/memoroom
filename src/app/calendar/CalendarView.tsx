@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { ChevronLeft, ChevronRight, Plus, Clock, User, Trash2, X, Wallet } from "lucide-react";
+import { ChevronLeft, ChevronRight, Plus, Clock, User, Trash2, X, Wallet, RefreshCw, Building2 } from "lucide-react";
 import { format, addMonths, subMonths, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isSameDay } from "date-fns";
 import { cn } from "@/lib/utils";
 
@@ -15,6 +15,7 @@ interface UsageLog {
 interface Reservation {
   id: string;
   source: string;
+  roomName: string;
   customerName: string | null;
   startTime: string;
   endTime: string;
@@ -28,10 +29,14 @@ export default function CalendarPage() {
   const [reservations, setReservations] = useState<Reservation[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isSyncing, setIsSyncing] = useState(false);
+  const [syncMessage, setSyncMessage] = useState<string | null>(null);
+  const [roomFilter, setRoomFilter] = useState<string>("all");
 
   // Form states for manual booking
   const [formName, setFormName] = useState("");
   const [formSource, setFormSource] = useState("manual");
+  const [formRoom, setFormRoom] = useState("머무룸1");
   const [formDate, setFormDate] = useState(format(new Date(), "yyyy-MM-dd"));
   const [formStartTime, setFormStartTime] = useState("14:00");
   const [formEndTime, setFormEndTime] = useState("17:00");
@@ -59,6 +64,26 @@ export default function CalendarPage() {
     fetchReservations();
   }, []);
 
+  const handleSyncEmails = async () => {
+    setIsSyncing(true);
+    setSyncMessage(null);
+    try {
+      const res = await fetch("/api/email-sync");
+      const data = await res.json();
+      if (data.success) {
+        setSyncMessage(`✅ ${data.message}`);
+        fetchReservations();
+      } else {
+        setSyncMessage(`❌ 동기화 실패: ${data.error}`);
+      }
+    } catch (err) {
+      setSyncMessage("❌ 메일 서버 연결에 실패했습니다.");
+    } finally {
+      setIsSyncing(false);
+      setTimeout(() => setSyncMessage(null), 5000);
+    }
+  };
+
   const firstDay = startOfMonth(currentDate);
   const lastDay = endOfMonth(currentDate);
   const daysInMonth = eachDayOfInterval({ start: firstDay, end: lastDay });
@@ -66,8 +91,12 @@ export default function CalendarPage() {
   const nextMonth = () => setCurrentDate(addMonths(currentDate, 1));
   const prevMonth = () => setCurrentDate(subMonths(currentDate, 1));
 
-  // Filter reservations for the selected date
-  const selectedReservations = reservations.filter((res) =>
+  // Filter reservations for the selected date and room
+  const filteredReservations = roomFilter === "all" 
+    ? reservations 
+    : reservations.filter((res) => res.roomName === roomFilter);
+
+  const selectedReservations = filteredReservations.filter((res) =>
     isSameDay(new Date(res.startTime), selectedDate)
   );
 
@@ -87,6 +116,7 @@ export default function CalendarPage() {
         },
         body: JSON.stringify({
           source: formSource,
+          roomName: formRoom,
           customerName: formName,
           startTime: startDateTime,
           endTime: endDateTime,
@@ -149,6 +179,19 @@ export default function CalendarPage() {
     }
   };
 
+  const getRoomBadgeStyle = (room: string) => {
+    switch (room) {
+      case "머무룸1":
+        return "bg-sky-50 text-sky-700 border border-sky-100";
+      case "머무룸2":
+        return "bg-purple-50 text-purple-700 border border-purple-100";
+      case "머무룸3":
+        return "bg-teal-50 text-teal-700 border border-teal-100";
+      default:
+        return "bg-slate-50 text-slate-700 border border-slate-100";
+    }
+  };
+
   return (
     <div className="p-4 space-y-6 h-full flex flex-col pb-24">
       <header className="pt-8 pb-4 flex justify-between items-center">
@@ -156,13 +199,55 @@ export default function CalendarPage() {
           <h1 className="text-2xl font-bold tracking-tight text-slate-900">통합 캘린더</h1>
           <p className="text-sm text-slate-500 mt-1">네이버 및 스페이스클라우드 예약 실시간 조회</p>
         </div>
-        <button
-          onClick={() => setIsModalOpen(true)}
-          className="p-3.5 bg-indigo-600 text-white rounded-full shadow-lg hover:bg-indigo-700 active:scale-95 transition-all"
-        >
-          <Plus className="w-5 h-5" />
-        </button>
+        <div className="flex gap-2">
+          <button
+            onClick={handleSyncEmails}
+            disabled={isSyncing}
+            className={cn(
+              "p-3.5 rounded-full shadow-lg transition-all active:scale-95",
+              isSyncing ? "bg-slate-400 cursor-wait" : "bg-emerald-600 hover:bg-emerald-700",
+              "text-white"
+            )}
+            title="메일 동기화"
+          >
+            <RefreshCw className={cn("w-5 h-5", isSyncing && "animate-spin")} />
+          </button>
+          <button
+            onClick={() => setIsModalOpen(true)}
+            className="p-3.5 bg-indigo-600 text-white rounded-full shadow-lg hover:bg-indigo-700 active:scale-95 transition-all"
+          >
+            <Plus className="w-5 h-5" />
+          </button>
+        </div>
       </header>
+
+      {/* Sync Message Toast */}
+      {syncMessage && (
+        <div className={cn(
+          "px-4 py-3 rounded-xl text-sm font-medium shadow-sm border animate-in fade-in slide-in-from-top-2 duration-300",
+          syncMessage.startsWith("✅") ? "bg-emerald-50 text-emerald-700 border-emerald-100" : "bg-rose-50 text-rose-700 border-rose-100"
+        )}>
+          {syncMessage}
+        </div>
+      )}
+
+      {/* Room Filter Tabs */}
+      <div className="flex gap-2">
+        {["all", "머무룸1", "머무룸2"].map((room) => (
+          <button
+            key={room}
+            onClick={() => setRoomFilter(room)}
+            className={cn(
+              "px-4 py-2 rounded-xl text-sm font-semibold transition-all active:scale-95 border",
+              roomFilter === room
+                ? "bg-indigo-600 text-white border-indigo-600 shadow-md"
+                : "bg-white text-slate-600 border-slate-200 hover:bg-slate-50"
+            )}
+          >
+            {room === "all" ? "전체" : room}
+          </button>
+        ))}
+      </div>
 
       {/* Calendar Grid Section */}
       <section className="bg-white rounded-2xl shadow-sm border border-slate-100 p-4 flex flex-col">
@@ -206,7 +291,7 @@ export default function CalendarPage() {
             const isSameMonthOfActive = isSameMonth(day, currentDate);
 
             // Filter reservations for this day
-            const dayReservations = reservations.filter((res) =>
+            const dayReservations = filteredReservations.filter((res) =>
               isSameDay(new Date(res.startTime), day)
             );
 
@@ -281,6 +366,9 @@ export default function CalendarPage() {
                       <span className={cn("px-1.5 py-0.5 rounded text-[10px] font-semibold", getSourceBadgeStyle(res.source))}>
                         {getSourceDisplay(res.source)}
                       </span>
+                      <span className={cn("px-1.5 py-0.5 rounded text-[10px] font-semibold", getRoomBadgeStyle(res.roomName))}>
+                        {res.roomName}
+                      </span>
                       <strong className="text-slate-900 text-sm">{res.customerName}</strong>
                     </div>
 
@@ -342,6 +430,18 @@ export default function CalendarPage() {
                     <option value="naver">네이버 예약</option>
                     <option value="spacecloud">스페이스클라우드</option>
                     <option value="manual">수동 예약</option>
+                  </select>
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-slate-500">공간 선택</label>
+                  <select
+                    value={formRoom}
+                    onChange={(e) => setFormRoom(e.target.value)}
+                    className="w-full text-sm p-2.5 rounded-xl border border-slate-200 outline-hidden focus:border-indigo-500 font-medium bg-white"
+                  >
+                    <option value="머무룸1">머무룸1</option>
+                    <option value="머무룸2">머무룸2</option>
                   </select>
                 </div>
 
