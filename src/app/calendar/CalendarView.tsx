@@ -1,10 +1,12 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { ChevronLeft, ChevronRight, Plus, Clock, User, Trash2, X, Wallet, RefreshCw, Building2 } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { ChevronLeft, ChevronRight, Plus, Clock, User, Trash2, X, Wallet, RefreshCw, Building2, Copy } from "lucide-react";
 import { format, addMonths, subMonths, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isSameDay } from "date-fns";
 import { cn } from "@/lib/utils";
 import { MAJOR_CATEGORIES, UNCATEGORIZED_LABEL } from "@/lib/categories";
+import TimeSelect from "@/components/TimeSelect";
 
 interface UsageLog {
   id: string;
@@ -32,6 +34,7 @@ interface Reservation {
 }
 
 export default function CalendarPage() {
+  const router = useRouter();
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [reservations, setReservations] = useState<Reservation[]>([]);
@@ -163,6 +166,28 @@ export default function CalendarPage() {
     } finally {
       setIsSubmitting(false);
     }
+  };
+
+  // 반복 예약 복사: 해당 예약 정보로 수동 추가 폼을 미리 채워 연다 (날짜만 바꿔 저장)
+  const openCopyModal = (res: Reservation) => {
+    const s = new Date(res.startTime);
+    const e = new Date(res.endTime);
+    const hhmm = (d: Date) => `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+    setFormName(res.customerName || "");
+    setFormPhone(res.phone || "");
+    setFormSource(res.source === "spacecloud" ? "spacecloud" : "naver");
+    setFormRoom(res.roomName || "머무룸1");
+    setFormDate(format(s, "yyyy-MM-dd"));
+    setFormStartTime(hhmm(s));
+    setFormEndTime(hhmm(e));
+    setFormPrice(String(res.price || 0));
+    // 온라인 결제는 수동 폼에 없으므로 현장카드로 기본 대체
+    setFormPaymentMethod(res.paymentMethod === "계좌이체" ? "계좌이체" : "현장카드");
+    setFormIsPaid(res.isPaid);
+    setFormGuests(String(res.usageLog?.headCount || 1));
+    setFormPurpose(res.usageLog?.purpose || "");
+    setFormDetail(res.usageLog?.detail || "");
+    setIsModalOpen(true);
   };
 
   const handleMarkPaid = async (id: string) => {
@@ -406,9 +431,11 @@ export default function CalendarPage() {
               return (
                 <div
                   key={res.id}
+                  onDoubleClick={() => router.push(`/usage?selected=${res.id}`)}
+                  title="더블클릭하면 이용현황에서 수정"
                   className={cn(
-                    "p-4 rounded-xl border flex justify-between items-start gap-2",
-                    isCancelled ? "bg-slate-100 border-slate-200" : "bg-slate-50 border-slate-100"
+                    "p-4 rounded-xl border flex justify-between items-start gap-2 cursor-pointer select-none",
+                    isCancelled ? "bg-slate-100 border-slate-200" : "bg-slate-50 border-slate-100 hover:border-indigo-200"
                   )}
                 >
                   <div className="space-y-2 flex-1">
@@ -475,13 +502,22 @@ export default function CalendarPage() {
                         결제완료 처리
                       </button>
                     )}
-                    <button
-                      onClick={() => handleDeleteReservation(res.id)}
-                      className="p-2 text-slate-400 hover:text-rose-500 rounded-lg hover:bg-rose-50 transition active:scale-95"
-                      title="예약 및 로그 삭제"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
+                    <div className="flex items-center gap-1">
+                      <button
+                        onClick={() => openCopyModal(res)}
+                        className="p-2 text-slate-400 hover:text-indigo-500 rounded-lg hover:bg-indigo-50 transition active:scale-95"
+                        title="이 예약 복사 (반복 예약 빠르게 추가)"
+                      >
+                        <Copy className="w-4 h-4" />
+                      </button>
+                      <button
+                        onClick={() => handleDeleteReservation(res.id)}
+                        className="p-2 text-slate-400 hover:text-rose-500 rounded-lg hover:bg-rose-50 transition active:scale-95"
+                        title="예약 및 로그 삭제"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
                   </div>
                 </div>
               );
@@ -569,24 +605,12 @@ export default function CalendarPage() {
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1">
                   <label className="text-xs font-bold text-slate-500">시작 시간</label>
-                  <input
-                    type="time"
-                    required
-                    value={formStartTime}
-                    onChange={(e) => setFormStartTime(e.target.value)}
-                    className="w-full text-sm p-2.5 rounded-xl border border-slate-200 outline-hidden focus:border-indigo-500 font-medium"
-                  />
+                  <TimeSelect value={formStartTime} onChange={setFormStartTime} />
                 </div>
 
                 <div className="space-y-1">
                   <label className="text-xs font-bold text-slate-500">종료 시간</label>
-                  <input
-                    type="time"
-                    required
-                    value={formEndTime}
-                    onChange={(e) => setFormEndTime(e.target.value)}
-                    className="w-full text-sm p-2.5 rounded-xl border border-slate-200 outline-hidden focus:border-indigo-500 font-medium"
-                  />
+                  <TimeSelect value={formEndTime} onChange={setFormEndTime} />
                 </div>
               </div>
 

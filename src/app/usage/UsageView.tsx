@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { Check, Search, Users, Coffee, Tag, AlertCircle, Pencil, ChevronDown } from "lucide-react";
 import { MAJOR_CATEGORIES, SUB_CATEGORIES, UNCATEGORIZED_LABEL } from "@/lib/categories";
+import TimeSelect from "@/components/TimeSelect";
 
 interface UsageLog {
   id: string;
@@ -33,6 +34,9 @@ export default function UsagePage() {
   const [coffeeCount, setCoffeeCount] = useState(0);
   const [selectedPurpose, setSelectedPurpose] = useState(""); // 대분류 ("" = 미선택)
   const [detail, setDetail] = useState(""); // 세부내용 자유입력
+  const [editDate, setEditDate] = useState("");   // 이용 날짜 (수정)
+  const [editStart, setEditStart] = useState(""); // 시작 시간 (수정)
+  const [editEnd, setEditEnd] = useState("");     // 종료 시간 (수정)
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [successMsg, setSuccessMsg] = useState("");
@@ -46,6 +50,12 @@ export default function UsagePage() {
 
         // Find a reservation in progress or closest upcoming, set as initial choice
         if (data.length > 0) {
+          // 캘린더에서 더블클릭으로 넘어온 경우 ?selected=<id> 예약을 우선 선택
+          const preselectId = typeof window !== "undefined"
+            ? new URLSearchParams(window.location.search).get("selected")
+            : null;
+          const preselected = preselectId ? data.find((r) => r.id === preselectId) : null;
+
           const now = new Date();
           const inProgress = data.find((r) => {
             const start = new Date(r.startTime);
@@ -53,13 +63,16 @@ export default function UsagePage() {
             return now >= start && now <= end;
           });
 
-          const defaultRes = inProgress || data[0];
+          const defaultRes = preselected || inProgress || data[0];
           setSelectedResId(defaultRes.id);
           setHeadCount(defaultRes.usageLog?.headCount || 2);
           setReserved(defaultRes.usageLog?.reservedHeadCount ?? defaultRes.usageLog?.headCount ?? 0);
           setCoffeeCount(defaultRes.usageLog?.coffeeCount || 0);
           setSelectedPurpose(defaultRes.usageLog?.purpose || "");
           setDetail(defaultRes.usageLog?.detail || "");
+          setEditDate(toDateInput(defaultRes.startTime));
+          setEditStart(toTimeInput(defaultRes.startTime));
+          setEditEnd(toTimeInput(defaultRes.endTime));
         }
       }
     } catch (err) {
@@ -83,11 +96,18 @@ export default function UsagePage() {
       setCoffeeCount(found.usageLog?.coffeeCount || 0);
       setSelectedPurpose(found.usageLog?.purpose || "");
       setDetail(found.usageLog?.detail || "");
+      setEditDate(toDateInput(found.startTime));
+      setEditStart(toTimeInput(found.startTime));
+      setEditEnd(toTimeInput(found.endTime));
     }
   };
 
   const handleSave = async () => {
     if (!selectedResId) return alert("기록할 예약을 먼저 선택하세요.");
+
+    if (editDate && editStart && editEnd && editEnd <= editStart) {
+      return alert("종료 시간이 시작 시간보다 빨라요. 확인해 주세요.");
+    }
 
     try {
       setIsSubmitting(true);
@@ -102,6 +122,9 @@ export default function UsagePage() {
           coffeeCount,
           purpose: selectedPurpose || null, // 미선택이면 null(미입력)
           detail: detail.trim() || null,
+          // 시간 수정
+          ...(editDate && editStart ? { startTime: `${editDate}T${editStart}:00` } : {}),
+          ...(editDate && editEnd ? { endTime: `${editDate}T${editEnd}:00` } : {}),
         }),
       });
 
@@ -157,6 +180,23 @@ export default function UsagePage() {
     const hours = d.getHours().toString().padStart(2, "0");
     const mins = d.getMinutes().toString().padStart(2, "0");
     return `${months}/${dates} ${hours}:${mins}`;
+  };
+
+  // ISO → 날짜/시간 입력값 (로컬 기준)
+  const pad2 = (n: number) => String(n).padStart(2, "0");
+  const toDateInput = (iso: string) => {
+    const d = new Date(iso);
+    return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
+  };
+  const toTimeInput = (iso: string) => {
+    const d = new Date(iso);
+    return `${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
+  };
+  // 분을 00/30으로 자동 보정 (0~29분→00, 30~59분→30)
+  const snapHalfHour = (t: string) => {
+    if (!t || !t.includes(":")) return t;
+    const [h, m] = t.split(":");
+    return `${h}:${parseInt(m || "0", 10) < 30 ? "00" : "30"}`;
   };
 
   // Last 5 modified logs for displaying recent actions safely
@@ -216,14 +256,29 @@ export default function UsagePage() {
             </div>
           )}
 
+          {/* 이용 시간 수정 (분은 00/30만) */}
           {selectedRes && (
-            <p className="mt-2 text-xs text-indigo-600 bg-indigo-50/50 p-2.5 rounded-lg border border-indigo-100 flex items-center gap-1">
-              <span className="font-semibold">이용 시간:</span>
-              <span>
-                {new Date(selectedRes.startTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false })} -{" "}
-                {new Date(selectedRes.endTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false })}
-              </span>
-            </p>
+            <div className="mt-3 space-y-3">
+              <div className="space-y-1">
+                <label className="text-[11px] font-bold text-slate-500">이용 날짜</label>
+                <input
+                  type="date"
+                  value={editDate}
+                  onChange={(e) => setEditDate(e.target.value)}
+                  className="w-full text-sm p-2.5 rounded-xl border border-slate-200 outline-hidden focus:border-indigo-500 font-medium text-slate-800"
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <label className="text-[11px] font-bold text-slate-500">시작</label>
+                  <TimeSelect value={editStart} onChange={setEditStart} />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[11px] font-bold text-slate-500">종료</label>
+                  <TimeSelect value={editEnd} onChange={setEditEnd} />
+                </div>
+              </div>
+            </div>
           )}
         </div>
 
