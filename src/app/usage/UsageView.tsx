@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Check, Search, Users, Coffee, Tag, AlertCircle, Pencil } from "lucide-react";
+import { Check, Search, Users, Coffee, Tag, AlertCircle, Pencil, ChevronDown } from "lucide-react";
 import { MAJOR_CATEGORIES, SUB_CATEGORIES, UNCATEGORIZED_LABEL } from "@/lib/categories";
 
 interface UsageLog {
@@ -20,12 +20,14 @@ interface Reservation {
   startTime: string;
   endTime: string;
   price: number;
+  emailId: string | null; // null = 수기 입력
   usageLog: UsageLog | null;
 }
 
 export default function UsagePage() {
   const [reservations, setReservations] = useState<Reservation[]>([]);
   const [selectedResId, setSelectedResId] = useState<string>("");
+  const [isSelectOpen, setIsSelectOpen] = useState(false); // 대상선택 커스텀 드롭다운 열림
   const [headCount, setHeadCount] = useState(0); // 실제 이용인원
   const [reserved, setReserved] = useState(0);   // 예약 이용인원 (읽기전용)
   const [coffeeCount, setCoffeeCount] = useState(0);
@@ -122,13 +124,30 @@ export default function UsagePage() {
   const getSourceDisplay = (source: string) => {
     switch (source) {
       case "naver":
-        return "네이버 예약";
+        return "네이버";
       case "spacecloud":
         return "스페이스클라우드";
+      case "direct":
+        return "직접";
       default:
-        return "수동 예약";
+        return "직접";
     }
   };
+
+  // 예약 루트별 글자색 (네이버=초록 / 스페이스클라우드=진한 파랑)
+  const sourceTextColor = (source: string) =>
+    source === "naver" ? "text-green-600"
+    : source === "spacecloud" ? "text-blue-700"
+    : "text-slate-500";
+
+  // 한 줄 라벨: 날짜 · 이름 (루트색) (수기)
+  const renderResLabel = (res: Reservation) => (
+    <span className="flex items-center gap-1 truncate">
+      <span className="text-slate-700">{formatDateLabel(res.startTime)} · {res.customerName}</span>
+      <span className={`font-bold ${sourceTextColor(res.source)}`}>({getSourceDisplay(res.source)})</span>
+      {!res.emailId && <span className="font-bold text-amber-600">✍️ 수기</span>}
+    </span>
+  );
 
   // Human readable date string formatting
   const formatDateLabel = (startTimeStr: string) => {
@@ -165,17 +184,36 @@ export default function UsagePage() {
           {isLoading ? (
             <div className="text-sm text-slate-400 py-2">연동 예약 내역을 불러오는 중...</div>
           ) : (
-            <select
-              value={selectedResId}
-              onChange={(e) => handleSelectionChange(e.target.value)}
-              className="w-full text-sm p-3.5 rounded-xl border border-slate-200 outline-hidden focus:border-indigo-500 font-semibold bg-white text-slate-800"
-            >
-              {reservations.map((res) => (
-                <option key={res.id} value={res.id}>
-                  {formatDateLabel(res.startTime)} · {res.customerName} ({getSourceDisplay(res.source)})
-                </option>
-              ))}
-            </select>
+            <div className="relative">
+              {/* 현재 선택 표시 버튼 */}
+              <button
+                type="button"
+                onClick={() => setIsSelectOpen((o) => !o)}
+                className="w-full flex items-center justify-between gap-2 text-sm p-3.5 rounded-xl border border-slate-200 focus:border-indigo-500 font-semibold bg-white text-slate-800"
+              >
+                {selectedRes ? renderResLabel(selectedRes) : <span className="text-slate-400">예약을 선택하세요</span>}
+                <ChevronDown className={`w-4 h-4 text-slate-400 flex-shrink-0 transition-transform ${isSelectOpen ? "rotate-180" : ""}`} />
+              </button>
+
+              {/* 드롭다운 목록 */}
+              {isSelectOpen && (
+                <>
+                  <div className="fixed inset-0 z-10" onClick={() => setIsSelectOpen(false)} />
+                  <div className="absolute z-20 mt-1 w-full max-h-72 overflow-auto bg-white border border-slate-200 rounded-xl shadow-lg py-1">
+                    {reservations.map((res) => (
+                      <button
+                        key={res.id}
+                        type="button"
+                        onClick={() => { handleSelectionChange(res.id); setIsSelectOpen(false); }}
+                        className={`w-full text-left text-sm px-3.5 py-2.5 hover:bg-slate-50 ${res.id === selectedResId ? "bg-indigo-50" : ""}`}
+                      >
+                        {renderResLabel(res)}
+                      </button>
+                    ))}
+                  </div>
+                </>
+              )}
+            </div>
           )}
 
           {selectedRes && (

@@ -58,9 +58,10 @@ export default async function DashboardPage() {
 
   const getSourceDisplay = (source: string) => {
     switch(source) {
-      case "naver": return "네이버 예약";
+      case "naver": return "네이버";
       case "spacecloud": return "스페이스클라우드";
-      default: return "수동 예약";
+      case "direct": return "직접";
+      default: return "직접";
     }
   };
 
@@ -169,10 +170,20 @@ export default async function DashboardPage() {
                       <span className={`px-1.5 py-0.5 rounded text-[10px] font-semibold ${labelColors}`}>
                         {getSourceDisplay(res.source)}
                       </span>
+                      {!res.emailId && (
+                        <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-amber-50 text-amber-700">
+                          ✍️수기
+                        </span>
+                      )}
                       <span className={`px-1.5 py-0.5 rounded text-[10px] font-semibold ${roomColors}`}>
                         {res.roomName}
                       </span>
                       <strong className={isCancelled ? "text-slate-500" : "text-slate-800"}>{res.customerName}</strong>
+                      {!isCancelled && !res.isPaid && (
+                        <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-rose-100 text-rose-600">
+                          💸 미결제
+                        </span>
+                      )}
                       <span>· {res.usageLog?.headCount || 0}명 ({res.usageLog?.purpose || UNCATEGORIZED_LABEL}{res.usageLog?.detail ? ` · ${res.usageLog.detail}` : ""})</span>
                       {res.price > 0 && (
                         <span className={`font-medium ${isCancelled ? "text-slate-500" : "text-emerald-600"}`}>

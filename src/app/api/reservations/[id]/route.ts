@@ -8,7 +8,7 @@ export async function PATCH(
   try {
     const { id } = await context.params;
     const body = await request.json();
-    const { customerName, startTime, endTime, price, headCount, reservedHeadCount, coffeeCount, purpose, detail } = body;
+    const { customerName, phone, startTime, endTime, price, paymentMethod, isPaid, headCount, reservedHeadCount, coffeeCount, purpose, detail } = body;
 
     // First check if reservation exists
     const existing = await prisma.reservation.findUnique({
@@ -24,9 +24,12 @@ export async function PATCH(
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const updateData: any = {};
     if (customerName !== undefined) updateData.customerName = customerName;
+    if (phone !== undefined) updateData.phone = phone;
     if (startTime !== undefined) updateData.startTime = new Date(startTime);
     if (endTime !== undefined) updateData.endTime = new Date(endTime);
     if (price !== undefined) updateData.price = Number(price);
+    if (paymentMethod !== undefined) updateData.paymentMethod = paymentMethod;
+    if (isPaid !== undefined) updateData.isPaid = Boolean(isPaid);
 
     // Prepare usage data update
     if (headCount !== undefined || reservedHeadCount !== undefined || coffeeCount !== undefined || purpose !== undefined || detail !== undefined) {

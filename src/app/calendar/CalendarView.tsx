@@ -19,11 +19,15 @@ interface Reservation {
   source: string;
   roomName: string;
   customerName: string | null;
+  phone: string | null;
   startTime: string;
   endTime: string;
   price: number;
   discount: number;
   status: string;
+  paymentMethod: string | null;
+  isPaid: boolean;
+  emailId: string | null; // null = 수기 입력 (메일 자동연동 아님)
   usageLog: UsageLog | null;
 }
 
@@ -39,7 +43,10 @@ export default function CalendarPage() {
 
   // Form states for manual booking
   const [formName, setFormName] = useState("");
-  const [formSource, setFormSource] = useState("manual");
+  const [formPhone, setFormPhone] = useState("");
+  const [formPaymentMethod, setFormPaymentMethod] = useState("현장카드");
+  const [formIsPaid, setFormIsPaid] = useState(true);
+  const [formSource, setFormSource] = useState("naver"); // 예약 루트 (네이버/스페이스클라우드)
   const [formRoom, setFormRoom] = useState("머무룸1");
   const [formDate, setFormDate] = useState(format(new Date(), "yyyy-MM-dd"));
   const [formStartTime, setFormStartTime] = useState("14:00");
@@ -126,9 +133,12 @@ export default function CalendarPage() {
           source: formSource,
           roomName: formRoom,
           customerName: formName,
+          phone: formPhone.trim() || null,
           startTime: startDateTime,
           endTime: endDateTime,
           price: parseInt(formPrice, 10) || 0,
+          paymentMethod: formPaymentMethod,
+          isPaid: formIsPaid,
           headCount: parseInt(formGuests, 10) || 1,
           purpose: formPurpose || null,
           detail: formDetail.trim() || null,
@@ -137,8 +147,12 @@ export default function CalendarPage() {
 
       if (response.ok) {
         setFormName("");
+        setFormPhone("");
         setFormPurpose("");
         setFormDetail("");
+        setFormPaymentMethod("현장카드");
+        setFormIsPaid(true);
+        setFormSource("naver");
         setIsModalOpen(false);
         fetchReservations();
       } else {
@@ -148,6 +162,20 @@ export default function CalendarPage() {
       console.error("Create booking error:", error);
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  const handleMarkPaid = async (id: string) => {
+    try {
+      const res = await fetch(`/api/reservations/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ isPaid: true }),
+      });
+      if (res.ok) fetchReservations();
+      else alert("결제완료 처리에 실패했습니다.");
+    } catch (err) {
+      console.error(err);
     }
   };
 
@@ -171,11 +199,13 @@ export default function CalendarPage() {
   const getSourceDisplay = (source: string) => {
     switch (source) {
       case "naver":
-        return "네이버 예약";
+        return "네이버";
       case "spacecloud":
         return "스페이스클라우드";
+      case "direct":
+        return "직접";
       default:
-        return "수동 예약";
+        return "직접";
     }
   };
 
@@ -205,7 +235,7 @@ export default function CalendarPage() {
 
   return (
     <div className="p-4 md:p-8 space-y-6 pb-24 max-w-7xl mx-auto w-full">
-      <header className="pt-8 pb-4 flex justify-between items-center">
+      <header className="pt-8 pb-4 flex justify-between items-center gap-3 flex-wrap">
         <div>
           <h1 className="text-2xl font-bold tracking-tight text-slate-900">통합 캘린더</h1>
           <p className="text-sm text-slate-500 mt-1">네이버 및 스페이스클라우드 예약 실시간 조회</p>
@@ -215,19 +245,21 @@ export default function CalendarPage() {
             onClick={handleSyncEmails}
             disabled={isSyncing}
             className={cn(
-              "p-3.5 rounded-full shadow-lg transition-all active:scale-95",
+              "flex items-center gap-1.5 px-3.5 py-2.5 rounded-xl shadow-md text-sm font-bold transition-all active:scale-95 whitespace-nowrap",
               isSyncing ? "bg-slate-400 cursor-wait" : "bg-emerald-600 hover:bg-emerald-700",
               "text-white"
             )}
             title="메일 동기화"
           >
-            <RefreshCw className={cn("w-5 h-5", isSyncing && "animate-spin")} />
+            <RefreshCw className={cn("w-4 h-4", isSyncing && "animate-spin")} />
+            {isSyncing ? "동기화 중..." : "메일 동기화"}
           </button>
           <button
             onClick={() => setIsModalOpen(true)}
-            className="p-3.5 bg-indigo-600 text-white rounded-full shadow-lg hover:bg-indigo-700 active:scale-95 transition-all"
+            className="flex items-center gap-1.5 px-3.5 py-2.5 bg-indigo-600 text-white text-sm font-bold rounded-xl shadow-md hover:bg-indigo-700 active:scale-95 transition-all whitespace-nowrap"
           >
-            <Plus className="w-5 h-5" />
+            <Plus className="w-4 h-4" />
+            수동 예약 추가
           </button>
         </div>
       </header>
@@ -389,10 +421,25 @@ export default function CalendarPage() {
                       <span className={cn("px-1.5 py-0.5 rounded text-[10px] font-semibold", getSourceBadgeStyle(res.source))}>
                         {getSourceDisplay(res.source)}
                       </span>
+                      {!res.emailId && (
+                        <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-amber-50 text-amber-700 border border-amber-100">
+                          ✍️수기
+                        </span>
+                      )}
                       <span className={cn("px-1.5 py-0.5 rounded text-[10px] font-semibold", getRoomBadgeStyle(res.roomName))}>
                         {res.roomName}
                       </span>
                       <strong className={cn("text-sm", isCancelled ? "text-slate-500 line-through" : "text-slate-900")}>{res.customerName}</strong>
+                      {!isCancelled && res.paymentMethod && (
+                        <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-slate-100 text-slate-600 border border-slate-200">
+                          {res.paymentMethod}
+                        </span>
+                      )}
+                      {!isCancelled && !res.isPaid && (
+                        <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-rose-100 text-rose-600 border border-rose-200">
+                          💸 미결제
+                        </span>
+                      )}
                     </div>
 
                     <div className="grid grid-cols-2 gap-y-1 gap-x-4 text-xs text-slate-500">
@@ -418,13 +465,24 @@ export default function CalendarPage() {
                     </div>
                   </div>
 
-                  <button
-                    onClick={() => handleDeleteReservation(res.id)}
-                    className="p-2 text-slate-400 hover:text-rose-500 rounded-lg hover:bg-rose-50 transition active:scale-95"
-                    title="예약 및 로그 삭제"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
+                  <div className="flex flex-col items-end gap-1.5">
+                    {!isCancelled && !res.isPaid && (
+                      <button
+                        onClick={() => handleMarkPaid(res.id)}
+                        className="px-2.5 py-1.5 text-[11px] font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg transition active:scale-95 whitespace-nowrap"
+                        title="결제완료로 변경"
+                      >
+                        결제완료 처리
+                      </button>
+                    )}
+                    <button
+                      onClick={() => handleDeleteReservation(res.id)}
+                      className="p-2 text-slate-400 hover:text-rose-500 rounded-lg hover:bg-rose-50 transition active:scale-95"
+                      title="예약 및 로그 삭제"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
                 </div>
               );
             })
@@ -450,15 +508,14 @@ export default function CalendarPage() {
             <form onSubmit={handleCreateReservation} className="p-4 space-y-4">
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1">
-                  <label className="text-xs font-bold text-slate-500">예약 소스</label>
+                  <label className="text-xs font-bold text-slate-500">예약 루트</label>
                   <select
                     value={formSource}
                     onChange={(e) => setFormSource(e.target.value)}
                     className="w-full text-sm p-2.5 rounded-xl border border-slate-200 outline-hidden focus:border-indigo-500 font-medium bg-white"
                   >
-                    <option value="naver">네이버 예약</option>
+                    <option value="naver">네이버</option>
                     <option value="spacecloud">스페이스클라우드</option>
-                    <option value="manual">수동 예약</option>
                   </select>
                 </div>
 
@@ -482,6 +539,17 @@ export default function CalendarPage() {
                     placeholder="김철수"
                     value={formName}
                     onChange={(e) => setFormName(e.target.value)}
+                    className="w-full text-sm p-2.5 rounded-xl border border-slate-200 outline-hidden focus:border-indigo-500 font-medium"
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-slate-500">전화번호 (선택)</label>
+                  <input
+                    type="tel"
+                    placeholder="010-1234-5678"
+                    value={formPhone}
+                    onChange={(e) => setFormPhone(e.target.value)}
                     className="w-full text-sm p-2.5 rounded-xl border border-slate-200 outline-hidden focus:border-indigo-500 font-medium"
                   />
                 </div>
@@ -561,18 +629,49 @@ export default function CalendarPage() {
                 />
               </div>
 
-              <div className="space-y-1">
-                <label className="text-xs font-bold text-slate-500">결제 가격 (원화)</label>
-                <input
-                  type="number"
-                  min="0"
-                  step="1000"
-                  required
-                  value={formPrice}
-                  onChange={(e) => setFormPrice(e.target.value)}
-                  className="w-full text-sm p-2.5 rounded-xl border border-slate-200 outline-hidden focus:border-indigo-500 font-medium"
-                />
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-slate-500">결제 가격 (원화)</label>
+                  <input
+                    type="number"
+                    min="0"
+                    step="1000"
+                    required
+                    value={formPrice}
+                    onChange={(e) => setFormPrice(e.target.value)}
+                    className="w-full text-sm p-2.5 rounded-xl border border-slate-200 outline-hidden focus:border-indigo-500 font-medium"
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-slate-500">결제 수단</label>
+                  <select
+                    value={formPaymentMethod}
+                    onChange={(e) => setFormPaymentMethod(e.target.value)}
+                    className="w-full text-sm p-2.5 rounded-xl border border-slate-200 outline-hidden focus:border-indigo-500 font-medium bg-white"
+                  >
+                    <option value="현장카드">현장카드</option>
+                    <option value="계좌이체">계좌이체</option>
+                  </select>
+                </div>
               </div>
+
+              {/* 결제 완료 여부 토글 */}
+              <button
+                type="button"
+                onClick={() => setFormIsPaid(!formIsPaid)}
+                className={`w-full flex items-center justify-between p-3 rounded-xl border transition active:scale-[0.99] ${
+                  formIsPaid
+                    ? "bg-emerald-50 border-emerald-200"
+                    : "bg-rose-50 border-rose-200"
+                }`}
+              >
+                <span className="text-sm font-bold text-slate-700">결제 완료 여부</span>
+                <span className={`flex items-center gap-1.5 text-sm font-bold ${formIsPaid ? "text-emerald-600" : "text-rose-600"}`}>
+                  <span className={`w-2.5 h-2.5 rounded-full ${formIsPaid ? "bg-emerald-500" : "bg-rose-500"}`} />
+                  {formIsPaid ? "결제완료" : "미결제"}
+                </span>
+              </button>
 
               <button
                 type="submit"

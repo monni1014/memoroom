@@ -23,16 +23,19 @@ export async function GET() {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { source, roomName, customerName, startTime, endTime, price, headCount, coffeeCount, purpose, detail } = body;
+    const { source, roomName, customerName, phone, startTime, endTime, price, headCount, coffeeCount, purpose, detail, paymentMethod, isPaid } = body;
 
     const reservation = await prisma.reservation.create({
       data: {
         source: source || "manual",
         roomName: roomName || "머무룸1",
         customerName: customerName || "미지정",
+        phone: phone || null,
         startTime: new Date(startTime),
         endTime: new Date(endTime),
         price: Number(price) || 0,
+        paymentMethod: paymentMethod || "온라인",
+        isPaid: isPaid !== undefined ? Boolean(isPaid) : true,
         usageLog: {
           create: {
             headCount: Number(headCount) || 1,
