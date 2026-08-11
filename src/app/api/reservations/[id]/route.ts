@@ -36,7 +36,7 @@ export async function PATCH(
   try {
     const { id } = await context.params;
     const body = await request.json();
-    const { source, customerName, customerType, phone, startTime, endTime, price, paymentMethod, isPaid, memo, discount, headCount, reservedHeadCount, coffeeCount, purpose, detail, roomName, complaints, isCleanUpBad, visitorReviewRequested, visitorReviewCompleted, visitorReviewRefunded, blogReviewRequested, blogReviewCompleted, blogReviewRefunded, reviewRefundAccountMessageAction, extraPrice, isExtraPaid, extraPaymentMethod, extraTime, status, isNoShow, resendNotification, pushSubscriptionEndpoint } = body;
+    const { source, customerName, customerType, phone, startTime, endTime, price, depositAmount, paymentMethod, isPaid, memo, discount, headCount, reservedHeadCount, coffeeCount, purpose, detail, roomName, complaints, isCleanUpBad, visitorReviewRequested, visitorReviewCompleted, visitorReviewRefunded, blogReviewRequested, blogReviewCompleted, blogReviewRefunded, reviewRefundAccountMessageAction, extraPrice, isExtraPaid, extraPaymentMethod, extraTime, status, isNoShow, resendNotification, pushSubscriptionEndpoint } = body;
 
     if (
       reviewRefundAccountMessageAction !== undefined
@@ -161,6 +161,16 @@ export async function PATCH(
       return NextResponse.json({ error: "endTime must be later than startTime" }, { status: 400 });
     }
 
+    const normalizedPrice = price !== undefined
+      ? Math.max(0, Math.trunc(Number(price) || 0))
+      : existing.price;
+    const normalizedDepositAmount = depositAmount !== undefined
+      ? Math.max(0, Math.trunc(Number(depositAmount) || 0))
+      : existing.depositAmount;
+    if (depositAmount !== undefined && normalizedDepositAmount > normalizedPrice) {
+      return NextResponse.json({ error: "depositAmount cannot exceed price" }, { status: 400 });
+    }
+
     // Prepare update data
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const updateData: any = {};
@@ -170,7 +180,10 @@ export async function PATCH(
     if (phone !== undefined) updateData.phone = phone;
     if (startTime !== undefined) updateData.startTime = parsedStartTime;
     if (endTime !== undefined) updateData.endTime = parsedEndTime;
-    if (price !== undefined) updateData.price = Number(price);
+    if (price !== undefined) updateData.price = normalizedPrice;
+    if (depositAmount !== undefined || (price !== undefined && existing.depositAmount > normalizedPrice)) {
+      updateData.depositAmount = Math.min(normalizedDepositAmount, normalizedPrice);
+    }
     if (discount !== undefined) updateData.discount = Number(discount);
     if (paymentMethod !== undefined) updateData.paymentMethod = paymentMethod;
     if (isPaid !== undefined) updateData.isPaid = Boolean(isPaid);

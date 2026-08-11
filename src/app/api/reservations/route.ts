@@ -33,7 +33,7 @@ export async function GET() {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { source, roomName, customerName, customerType, phone, startTime, endTime, price, headCount, coffeeCount, purpose, detail, paymentMethod, isPaid, memo, discount, pushSubscriptionEndpoint } = body;
+    const { source, roomName, customerName, customerType, phone, startTime, endTime, price, depositAmount, headCount, coffeeCount, purpose, detail, paymentMethod, isPaid, memo, discount, pushSubscriptionEndpoint } = body;
 
     if (!VALID_ROOM_NAMES.has(roomName)) {
       return NextResponse.json({ error: "A valid roomName is required" }, { status: 400 });
@@ -46,6 +46,12 @@ export async function POST(request: NextRequest) {
     }
     if (parsedEndTime.getTime() <= parsedStartTime.getTime()) {
       return NextResponse.json({ error: "endTime must be later than startTime" }, { status: 400 });
+    }
+
+    const normalizedPrice = Math.max(0, Math.trunc(Number(price) || 0));
+    const normalizedDepositAmount = Math.max(0, Math.trunc(Number(depositAmount) || 0));
+    if (normalizedDepositAmount > normalizedPrice) {
+      return NextResponse.json({ error: "depositAmount cannot exceed price" }, { status: 400 });
     }
 
     // Check if the same person (by name or phone) has a previous 'isCleanUpBad' record
@@ -80,10 +86,13 @@ export async function POST(request: NextRequest) {
         syncedEndTime: ["naver", "spacecloud"].includes(source)
           ? parsedEndTime
           : null,
-        price: Number(price) || 0,
+        price: normalizedPrice,
         discount: Number(discount) || 0,
         paymentMethod: paymentMethod || "온라인",
-        isPaid: isPaid !== undefined ? Boolean(isPaid) : true,
+        isPaid: isPaid !== undefined
+          ? Boolean(isPaid)
+          : normalizedDepositAmount >= normalizedPrice,
+        depositAmount: normalizedDepositAmount,
         isCleanUpBad: autoCleanUpBad,
         memo: memo || null,
         usageLog: {

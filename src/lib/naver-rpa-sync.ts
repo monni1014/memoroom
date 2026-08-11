@@ -612,13 +612,17 @@ async function deleteDetachedCancellationPending(messageId: string, keptReservat
     || pending.source !== "naver"
     || pending.status !== "CANCELLED"
     || !pending.memo?.includes(RPA_PENDING_MARKER)
-  ) return;
+  ) return false;
 
   await prisma.$transaction([
     // Keep every already-sent message attached to the canonical reservation
     // before removing the temporary cancellation row.  Otherwise Prisma's
     // onDelete:SetNull makes the message disappear from the status screen.
     prisma.customerMessage.updateMany({
+      where: { reservationId: pending.id },
+      data: { reservationId: keptReservationId },
+    }),
+    prisma.processedEmail.updateMany({
       where: { reservationId: pending.id },
       data: { reservationId: keptReservationId },
     }),
@@ -632,6 +636,7 @@ async function deleteDetachedCancellationPending(messageId: string, keptReservat
     }),
   ]);
   console.log(`[NaverRPA] Removed detached cancellation pending row: ${pending.id}`);
+  return true;
 }
 
 async function cancelNaverReservation(
@@ -650,7 +655,8 @@ async function cancelNaverReservation(
       existing.memo?.split(/\r?\n/).some((line) => line.includes(RPA_CHECK_MARKER) && isObsoleteCloseCheckLine(line)),
     );
     if (existing.status === "CANCELLED" && existing.price === cancellationPrice && !wasPending && !hasObsoleteCloseCheck) {
-      return { reservation: existing, created: false, changed: false };
+      const removedDetachedPending = await deleteDetachedCancellationPending(messageId, existing.id);
+      return { reservation: existing, created: false, changed: removedDetachedPending };
     }
 
     // The calendar is the source of truth for cancellation coverage. An owner

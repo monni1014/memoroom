@@ -40,7 +40,7 @@ type DeliveryEntry = {
   resultAt: string | null;
   providerMessageId: string | null;
   isTest: boolean;
-  messageType: "GUIDE" | "DAWN_BOOKING" | "ON_TIME_EXIT" | "SITE_VISIT" | "UNPAID" | "REVIEW_REFUND_ACCOUNT" | "SITUATION";
+  messageType: "GUIDE" | "DAWN_BOOKING" | "ON_TIME_EXIT" | "SITE_VISIT" | "UNPAID" | "DEPOSIT_BALANCE" | "REVIEW_REFUND_ACCOUNT" | "SITUATION";
   messageLabel: string;
   guideExclusion?: {
     canExclude: boolean;
@@ -127,6 +127,8 @@ function messageTypeBadgeStyle(messageType: DeliveryEntry["messageType"]) {
       return "bg-rose-50 text-rose-700 ring-rose-200";
     case "UNPAID":
       return "bg-rose-50 text-rose-700 ring-rose-200";
+    case "DEPOSIT_BALANCE":
+      return "bg-orange-50 text-orange-700 ring-orange-200";
     case "SITUATION":
       return "bg-orange-50 text-orange-700 ring-orange-200";
     default:

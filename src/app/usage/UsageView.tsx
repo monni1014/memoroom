@@ -36,6 +36,7 @@ interface Reservation {
   createdAt: string;
   updatedAt: string;
   price: number;
+  depositAmount: number;
   discount: number;
   status: string;
   isNoShow: boolean;
@@ -141,6 +142,7 @@ export default function UsagePage() {
   const [memo, setMemo] = useState(""); // 관리자 비고란
   const [complaints, setComplaints] = useState(""); // 고객 불만사항
   const [isPaid, setIsPaid] = useState(true); // 결제여부
+  const [depositAmount, setDepositAmount] = useState(0); // 미리 받은 예약금
   const [isCleanUpBad, setIsCleanUpBad] = useState(false); // 정리불량
   const [visitorReviewRequested, setVisitorReviewRequested] = useState(false);
   const [visitorReviewCompleted, setVisitorReviewCompleted] = useState(false);
@@ -212,6 +214,7 @@ export default function UsagePage() {
           setMemo(defaultRes.memo || "");
           setComplaints(defaultRes.complaints || "");
           setIsPaid(defaultRes.isPaid ?? true);
+          setDepositAmount(defaultRes.depositAmount ?? 0);
           setIsCleanUpBad(defaultRes.isCleanUpBad ?? false);
           setVisitorReviewRequested(defaultRes.visitorReviewRequested ?? false);
           setVisitorReviewCompleted(defaultRes.visitorReviewCompleted ?? false);
@@ -314,6 +317,7 @@ export default function UsagePage() {
       setMemo(found.memo || "");
       setComplaints(found.complaints || "");
       setIsPaid(found.isPaid ?? true);
+      setDepositAmount(found.depositAmount ?? 0);
       setIsCleanUpBad(found.isCleanUpBad ?? false);
       setVisitorReviewRequested(found.visitorReviewRequested ?? false);
       setVisitorReviewCompleted(found.visitorReviewCompleted ?? false);
@@ -475,6 +479,7 @@ export default function UsagePage() {
           purpose: selectedPurpose || null, // 미선택이면 null(미입력)
           detail: detail.trim() || null,
           price: finalPrice, // 캘린더/대시보드/통계에 쓰는 최종 매출액(기본 예약금 + 추가금)
+          depositAmount: Math.min(depositAmount, finalPrice),
           extraPrice: extraPrice,
           isExtraPaid: isExtraPaid,
           extraPaymentMethod: extraPaymentMethod,
@@ -1035,7 +1040,9 @@ export default function UsagePage() {
                         if (!/^\d*$/.test(valStr)) return;
                         const val = Number(valStr);
                         setOriginalPrice(val);
-                        setCurrentPrice(val + extraPrice);
+                        const nextPrice = val + extraPrice;
+                        setCurrentPrice(nextPrice);
+                        setDepositAmount((current) => Math.min(current, nextPrice));
                       }}
                       className="w-32 text-left bg-white border border-slate-200 text-slate-700 font-bold text-lg p-1.5 pl-2 pr-6 rounded-lg outline-hidden focus:border-slate-400 shadow-xs transition-all"
                     />
@@ -1055,7 +1062,9 @@ export default function UsagePage() {
                         if (!/^\d*$/.test(valStr)) return;
                         const val = Number(valStr);
                         setExtraPrice(val);
-                        setCurrentPrice(originalPrice + val);
+                        const nextPrice = originalPrice + val;
+                        setCurrentPrice(nextPrice);
+                        setDepositAmount((current) => Math.min(current, nextPrice));
                       }}
                       className="w-32 text-right bg-white border-2 border-rose-200 text-rose-600 font-bold text-lg p-1.5 pr-6 rounded-lg outline-hidden focus:border-rose-400 shadow-xs transition-all"
                     />
@@ -1109,6 +1118,7 @@ export default function UsagePage() {
                     const val = Number(valStr);
                     setCurrentPrice(val);
                     setOriginalPrice(Math.max(0, val - extraPrice));
+                    setDepositAmount((current) => Math.min(current, val));
                   }}
                   className="w-full text-lg p-3.5 pl-10 rounded-xl border border-slate-200 outline-hidden focus:border-indigo-500 font-bold text-slate-800 bg-emerald-50/30"
                 />
@@ -1121,6 +1131,38 @@ export default function UsagePage() {
               >
                 {isPaid ? "결제 완료" : "미수금"}
               </button>
+            </div>
+            <div className="grid grid-cols-2 gap-3 rounded-xl border border-amber-200 bg-amber-50/60 p-3">
+              <label className="space-y-1.5">
+                <span className="text-sm font-bold text-amber-800">받은 예약금</span>
+                <div className="relative">
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    value={depositAmount === 0 ? "" : depositAmount.toLocaleString()}
+                    placeholder="0"
+                    onChange={(event) => {
+                      const raw = event.target.value.replace(/,/g, "");
+                      if (!/^\d*$/.test(raw)) return;
+                      const nextDeposit = Math.min(Number(raw || 0), currentPrice);
+                      setDepositAmount(nextDeposit);
+                      setIsPaid(currentPrice > 0 && nextDeposit >= currentPrice);
+                    }}
+                    className="w-full rounded-lg border border-amber-200 bg-white py-2.5 pl-3 pr-8 text-base font-bold text-slate-800 outline-hidden focus:border-amber-400"
+                  />
+                  <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-sm font-bold text-slate-400">원</span>
+                </div>
+              </label>
+              <div className="space-y-1.5">
+                <span className="text-sm font-bold text-slate-600">남은 잔금</span>
+                <div className={`rounded-lg border bg-white px-3 py-2.5 text-right text-base font-extrabold ${
+                  !isPaid && currentPrice - depositAmount > 0
+                    ? "border-rose-200 text-rose-600"
+                    : "border-emerald-200 text-emerald-700"
+                }`}>
+                  {Math.max(0, isPaid ? 0 : currentPrice - depositAmount).toLocaleString()}원
+                </div>
+              </div>
             </div>
           </div>
         )}

@@ -34,6 +34,7 @@ model Reservation {
   isNoShow               Boolean   @default(false) // 취소 중에서도 노쇼인 경우 (수수료/집계는 취소와 동일, 표기만 구분)
   paymentMethod          String?   @default("온라인") // "현장카드" | "계좌이체" | "온라인"
   isPaid                 Boolean   @default(true) // 결제 완료 여부 (이체 등 미결제는 false)
+  depositAmount          Int       @default(0) // 미리 받은 예약금. 최종 매출액과의 차액을 잔금으로 관리
   emailId                String?   @unique
   memo                   String? // 자유 기입 비고란
   complaints             String? // 고객 불만사항 (CS 관리용 별도 항목)

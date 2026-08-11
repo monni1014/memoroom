@@ -43,7 +43,7 @@ type MessageTemplateState = {
 };
 
 type SituationMessageTemplateState = {
-  key: "DAWN_BOOKING_CONFIRMATION" | "UNPAID_RESERVATION" | "ON_TIME_EXIT_REMINDER" | "SITE_VISIT_GUIDE" | "REVIEW_REFUND_ACCOUNT_REQUEST";
+  key: "DAWN_BOOKING_CONFIRMATION" | "UNPAID_RESERVATION" | "ON_TIME_EXIT_REMINDER" | "SITE_VISIT_GUIDE" | "REVIEW_REFUND_ACCOUNT_REQUEST" | "DEPOSIT_BALANCE_REMINDER";
   name: string;
   triggerDescription: string;
   automationDescription: string;

@@ -37,6 +37,8 @@
     "test:naver-rpa-performance": "node scripts/test-naver-rpa-performance.mjs",
     "test:naver-booking-row": "node scripts/test-naver-booking-row.mjs",
     "test:naver-cancellation-times": "node --experimental-strip-types scripts/test-naver-cancellation-times.mjs",
+    "test:naver-cancellation-dedupe": "node scripts/test-naver-cancellation-dedupe.mjs",
+    "test:deposit-balance": "node --experimental-strip-types scripts/test-deposit-balance-policy.mjs",
     "test:spacecloud-rpa-performance": "node scripts/test-spacecloud-rpa-performance.mjs",
     "test:spacecloud-session-refresh": "node scripts/test-spacecloud-session-refresh.mjs",
     "test:rpa-browser-isolation": "node scripts/test-shared-browser-isolation.mjs",

@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { CLEANING_ROOM_NAMES, type CleaningRoomName } from "@/lib/cleaning-schedule";
+import { DEFAULT_DEPOSIT_BALANCE_MESSAGE } from "@/lib/deposit-balance-policy";
 
 export const SITUATION_MESSAGE_TEMPLATE_DEFINITIONS = [
   {
@@ -31,6 +32,12 @@ export const SITUATION_MESSAGE_TEMPLATE_DEFINITIONS = [
     name: "미정산 안내",
     triggerDescription: "예약이 미정산 상태인 경우",
     automationDescription: "발송 시점을 확정한 뒤 미정산 자동발송에 연결합니다.",
+  },
+  {
+    key: "DEPOSIT_BALANCE_REMINDER",
+    name: "예약 잔금 안내",
+    triggerDescription: "예약금을 받은 예약의 이용이 끝났지만 잔금이 남은 경우",
+    automationDescription: "이용 종료 후 고객에게 잔금 안내 문자를 한 번 보내고 관리자 푸시로 알려드립니다.",
   },
 ] as const;
 
@@ -81,17 +88,22 @@ function siteVisitRoomContents(value: unknown, fallbackContent = ""): SiteVisitR
 }
 
 function parseStoredTemplate(key: SituationMessageTemplateKey, value: string | undefined) {
+  const defaultContent = key === "DEPOSIT_BALANCE_REMINDER"
+    ? DEFAULT_DEPOSIT_BALANCE_MESSAGE
+    : "";
   if (!value) {
     return {
       subject: "",
-      content: "",
+      content: defaultContent,
       roomContents: key === "SITE_VISIT_GUIDE" ? siteVisitRoomContents(null) : null,
     };
   }
 
   try {
     const parsed = JSON.parse(value) as StoredSituationMessageTemplate;
-    const content = typeof parsed.content === "string" ? parsed.content : "";
+    const content = typeof parsed.content === "string" && parsed.content.trim()
+      ? parsed.content
+      : defaultContent;
     return {
       subject: typeof parsed.subject === "string" ? parsed.subject : "",
       content,
@@ -102,7 +114,7 @@ function parseStoredTemplate(key: SituationMessageTemplateKey, value: string | u
   } catch {
     return {
       subject: "",
-      content: "",
+      content: defaultContent,
       roomContents: key === "SITE_VISIT_GUIDE" ? siteVisitRoomContents(null) : null,
     };
   }

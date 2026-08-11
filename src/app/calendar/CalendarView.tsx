@@ -57,6 +57,7 @@ interface Reservation {
   isNoShow: boolean;
   paymentMethod: string | null;
   isPaid: boolean;
+  depositAmount: number;
   memo: string | null;
   complaints: string | null;
   isCleanUpBad: boolean;
@@ -295,6 +296,7 @@ export default function CalendarPage() {
   const [selectedDate, setSelectedDate] = useState<Date>(initialDate);
   const [reservations, setReservations] = useState<Reservation[]>([]);
   const [cleaningSchedules, setCleaningSchedules] = useState<CleaningSchedule[]>([]);
+  const [calendarLoadedAtMs, setCalendarLoadedAtMs] = useState(0);
   const [holidayNamesByDate, setHolidayNamesByDate] = useState<Record<string, readonly string[]>>({});
   const [isLoading, setIsLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -397,6 +399,8 @@ export default function CalendarPage() {
       ]);
       if (reservationResponse.ok) setReservations(await reservationResponse.json());
       if (cleaningResponse.ok) setCleaningSchedules(await cleaningResponse.json());
+      const responseDate = reservationResponse.headers.get("date");
+      if (responseDate) setCalendarLoadedAtMs(Date.parse(responseDate));
     } catch (err) {
       console.error("Failed to load calendar data:", err);
     } finally {
@@ -1421,7 +1425,7 @@ export default function CalendarPage() {
             const dayCleaningSchedules = filteredCleaningSchedules
               .filter((schedule) => isSameDay(new Date(schedule.startTime), day))
               .sort((a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime());
-            const hasUnpaid = dayReservations.some((res) => !res.isPaid && res.status !== "CANCELLED");
+            const hasUnpaid = dayReservations.some((res) => !res.isPaid && (res.depositAmount ?? 0) <= 0 && res.status !== "CANCELLED");
             const hasUnpaidExtra = dayReservations.some((res) => res.usageLog && (res.usageLog.extraPrice ?? 0) > 0 && !res.usageLog.isExtraPaid && res.status !== "CANCELLED");
 
             return (
@@ -1748,7 +1752,13 @@ export default function CalendarPage() {
               const isCancelled = res.status === "CANCELLED";
               const isExpanded = expandedReservationId === res.id;
               const headCount = res.usageLog?.headCount || 1;
-              const hasUnpaid = !isCancelled && !res.isPaid;
+              const depositAmount = Math.min(Math.max(0, res.depositAmount ?? 0), Math.max(0, res.price));
+              const depositBalance = res.isPaid ? 0 : Math.max(0, res.price - depositAmount);
+              const hasDepositBalance = !isCancelled && depositAmount > 0 && depositBalance > 0;
+              const depositBalanceOverdue = hasDepositBalance
+                && calendarLoadedAtMs > 0
+                && end.getTime() <= calendarLoadedAtMs;
+              const hasUnpaid = !isCancelled && !res.isPaid && depositAmount <= 0;
               const hasUnpaidExtra = !isCancelled
                 && (res.usageLog?.extraPrice ?? 0) > 0
                 && !res.usageLog?.isExtraPaid;
@@ -1841,9 +1851,18 @@ export default function CalendarPage() {
                             </span>
                           )}
                         </span>
-                        {!isCancelled && !res.isPaid && (
+                        {hasDepositBalance ? (
+                          <span className={cn(
+                            "shrink-0 rounded px-1.5 py-0.5 text-[10px] font-bold",
+                            depositBalanceOverdue
+                              ? "bg-rose-50 text-rose-600 ring-1 ring-rose-200"
+                              : "bg-amber-50 text-amber-700 ring-1 ring-amber-200",
+                          )}>
+                            {depositBalanceOverdue ? "잔금 필요" : "예약금"}
+                          </span>
+                        ) : hasUnpaid ? (
                           <span className="shrink-0 text-[11px] font-bold text-rose-600">미수</span>
-                        )}
+                        ) : null}
                         {(hasUnpaid || hasUnpaidExtra) && (
                           <span className="flex shrink-0 items-center gap-0.5" aria-label="미결제 상태">
                             {hasUnpaid && (
@@ -1864,7 +1883,9 @@ export default function CalendarPage() {
                             "rounded border px-1.5 py-0.5 text-[10px] font-semibold",
                             res.isPaid
                               ? "border-slate-200 bg-slate-100 text-slate-600"
-                              : "border-rose-300 bg-rose-50 text-rose-600"
+                              : hasDepositBalance
+                                ? "border-amber-200 bg-amber-50 text-amber-700"
+                                : "border-rose-300 bg-rose-50 text-rose-600"
                           )}>
                             {getPaymentMethodDisplay(res.paymentMethod)}
                           </span>
@@ -1939,10 +1960,12 @@ export default function CalendarPage() {
                         <span className={cn(
                           "hidden px-1.5 py-0.5 rounded text-[10px] font-semibold border md:inline-flex",
                           res.isPaid 
-                            ? "bg-slate-100 text-slate-600 border-slate-200" 
-                            : "bg-rose-50 text-rose-600 border-rose-300 shadow-sm shadow-rose-100"
+                            ? "bg-slate-100 text-slate-600 border-slate-200"
+                            : hasDepositBalance
+                              ? "bg-amber-50 text-amber-700 border-amber-200"
+                              : "bg-rose-50 text-rose-600 border-rose-300 shadow-sm shadow-rose-100"
                         )}>
-                          {getPaymentMethodDisplay(res.paymentMethod)}{!res.isPaid && "(미수)"}
+                          {getPaymentMethodDisplay(res.paymentMethod)}{hasDepositBalance ? "(잔금)" : !res.isPaid ? "(미수)" : ""}
                         </span>
                       )}
                       {!isCancelled && res.usageLog && (res.usageLog.extraPrice ?? 0) > 0 && (
@@ -1975,6 +1998,12 @@ export default function CalendarPage() {
                         <p className="flex min-w-0 items-center gap-1 text-slate-700">
                           <Wallet className="h-3.5 w-3.5 shrink-0 text-slate-400" />
                           <span>{isCancelled ? "수수료" : "요금"}: <strong className="text-slate-800">{res.price.toLocaleString()}원</strong></span>
+                        </p>
+                      )}
+                      {hasDepositBalance && (
+                        <p className="flex min-w-0 items-center gap-1 text-amber-700">
+                          <Wallet className="h-3.5 w-3.5 shrink-0 text-amber-500" />
+                          <span>예약금 <strong>{depositAmount.toLocaleString()}원</strong> · 잔금 <strong className={depositBalanceOverdue ? "text-rose-600" : "text-amber-700"}>{depositBalance.toLocaleString()}원</strong></span>
                         </p>
                       )}
                       {res.phone && (

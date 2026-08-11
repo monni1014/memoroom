@@ -22,6 +22,10 @@ assert.deepEqual(
   { type: "UNPAID", label: "미정산 안내" },
 );
 assert.deepEqual(
+  customerMessageDisplay("situation:deposit-balance:reservation-1"),
+  { type: "DEPOSIT_BALANCE", label: "예약 잔금 안내" },
+);
+assert.deepEqual(
   customerMessageDisplay("situation:review-refund-account:reservation-1"),
   { type: "REVIEW_REFUND_ACCOUNT", label: "리뷰 계좌 요청" },
 );
