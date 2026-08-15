@@ -348,6 +348,7 @@ export default function CalendarPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [pendingDeleteReservationId, setPendingDeleteReservationId] = useState<string | null>(null);
   const [isDeletingReservation, setIsDeletingReservation] = useState(false);
+  const [updatingExtraPaymentId, setUpdatingExtraPaymentId] = useState<string | null>(null);
   const [showMultiPicker, setShowMultiPicker] = useState(false);
   const [isReservationContactMenuOpen, setIsReservationContactMenuOpen] = useState(false);
 
@@ -1083,6 +1084,31 @@ export default function CalendarPage() {
     }
   };
 
+  const handleMarkExtraPaid = async (id: string) => {
+    if (updatingExtraPaymentId) return;
+
+    setUpdatingExtraPaymentId(id);
+    try {
+      const response = await fetch(`/api/reservations/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ isExtraPaid: true }),
+      });
+
+      if (!response.ok) {
+        alert("추가금 결제완료 처리에 실패했습니다.");
+        return;
+      }
+
+      await fetchReservations();
+    } catch (error) {
+      console.error("Extra payment update failed:", error);
+      alert("추가금 결제완료 처리에 실패했습니다.");
+    } finally {
+      setUpdatingExtraPaymentId(null);
+    }
+  };
+
   const resetCleaningForm = (
     date = selectedDate,
     scheduleType: "CLEANING" | "SITE_VISIT" = "CLEANING",
@@ -1474,7 +1500,7 @@ export default function CalendarPage() {
                     const compactClock = startParts.minute === 0
                       ? String(startParts.hour)
                       : `${startParts.hour}:${String(startParts.minute).padStart(2, "0")}`;
-                    const isCancelled = res.status === "CANCELLED";
+                    const isCancelled = res.status === "CANCELLED" && !res.isNoShow;
                     return (
                       <span
                         key={`reservation-${res.id}`}
@@ -1493,6 +1519,7 @@ export default function CalendarPage() {
                 <div className="mt-1 hidden h-2 justify-center gap-0.5 sm:flex">
                   {dayReservations.map((res) => {
                     const dotClass =
+                      res.status === "CANCELLED" && res.isNoShow ? "bg-orange-500" :
                       res.status === "CANCELLED" ? "bg-slate-300" :
                       !res.isPaid ? (res.source === "naver" ? "bg-rose-400" : res.source === "spacecloud" ? "bg-rose-700" : "bg-rose-500") :
                       res.source === "naver" ? "bg-green-500" :
@@ -1750,6 +1777,8 @@ export default function CalendarPage() {
               const end = new Date(res.endTime);
               const displayEndTime = formatAmPmClock(extendedEndClock(start, end));
               const isCancelled = res.status === "CANCELLED";
+              const isNoShow = isCancelled && res.isNoShow;
+              const isCancellationOnly = isCancelled && !isNoShow;
               const isExpanded = expandedReservationId === res.id;
               const headCount = res.usageLog?.headCount || 1;
               const depositAmount = Math.min(Math.max(0, res.depositAmount ?? 0), Math.max(0, res.price));
@@ -1806,22 +1835,22 @@ export default function CalendarPage() {
                   title="더블클릭하면 이용현황에서 수정"
                   className={cn(
                     "relative flex flex-col gap-3 rounded-xl border border-l-4 px-3 py-2.5 cursor-pointer select-none sm:p-4 md:flex-row md:items-start md:justify-between md:gap-2",
-                    isCancelled ? "bg-slate-100 border-slate-200" : "bg-slate-50 border-slate-100",
-                    getSourceAccentStyle(res.source, isCancelled)
+                    isNoShow ? "bg-orange-50 border-orange-100" : isCancellationOnly ? "bg-slate-100 border-slate-200" : "bg-slate-50 border-slate-100",
+                    getSourceAccentStyle(res.source, isCancellationOnly)
                   )}
                 >
                   <div className="flex min-w-0 items-center gap-3 md:hidden">
                     <div className="w-[58px] shrink-0 text-center">
-                      <strong className={cn("block text-sm", isCancelled ? "text-slate-400 line-through" : "text-slate-900")}>{formatCalendarTime(start)}</strong>
+                      <strong className={cn("block text-sm", isCancellationOnly ? "text-slate-400 line-through" : "text-slate-900")}>{formatCalendarTime(start)}</strong>
                       <span className="text-[10px] font-medium text-slate-400">~ {displayEndTime}</span>
                     </div>
                     <div className="min-w-0 flex-1">
                       <div className="flex min-w-0 items-center gap-1.5">
-                        <span className={cn("shrink-0 rounded px-1.5 py-0.5 text-[10px] font-bold", getRoomCalendarStyle(res.roomName, isCancelled))}>
+                        <span className={cn("shrink-0 rounded px-1.5 py-0.5 text-[10px] font-bold", getRoomCalendarStyle(res.roomName, isCancellationOnly))}>
                           {res.roomName.replace(/^머무룸/, "")}
                         </span>
                         <span className="flex min-w-0 flex-1 items-center gap-1">
-                          <strong className={cn("min-w-0 shrink truncate text-sm", isCancelled ? "text-slate-500 line-through" : "text-slate-900")}>
+                          <strong className={cn("min-w-0 shrink truncate text-sm", isCancellationOnly ? "text-slate-500 line-through" : "text-slate-900")}>
                             {res.customerName ?? "이름 미확인"}
                           </strong>
                           {reviewBadge && (
@@ -1836,7 +1865,7 @@ export default function CalendarPage() {
                               <PhoneActionLink
                                 phone={res.phone}
                                 contactName={res.customerName}
-                                cancelled={isCancelled}
+                                cancelled={isCancellationOnly}
                                 className="truncate"
                                 iconClassName="hidden"
                               />
@@ -1893,10 +1922,29 @@ export default function CalendarPage() {
                         <span>·</span>
                         <span>{headCount}명</span>
                         {res.price > 0 && <><span>·</span><span>{res.price.toLocaleString()}원</span></>}
-                        {isCancelled && <span className="font-bold text-slate-500">· 취소</span>}
+                        {isCancelled && (
+                          <span className={cn("font-bold", isNoShow ? "text-orange-600" : "text-slate-500")}>
+                            · {isNoShow ? "노쇼" : "취소"}
+                          </span>
+                        )}
                       </div>
                     </div>
-                    <div className="flex shrink-0 items-center">
+                    <div className="flex shrink-0 flex-col items-end gap-1">
+                      {hasUnpaidExtra && !isExpanded && (
+                        <button
+                          type="button"
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            void handleMarkExtraPaid(res.id);
+                          }}
+                          onDoubleClick={(event) => event.stopPropagation()}
+                          disabled={updatingExtraPaymentId === res.id}
+                          className="rounded-md border border-emerald-200 bg-emerald-50 px-1.5 py-1 text-[9px] font-bold leading-none text-emerald-700 transition hover:bg-emerald-100 disabled:cursor-wait disabled:opacity-60"
+                          title="추가금을 결제완료로 변경"
+                        >
+                          {updatingExtraPaymentId === res.id ? "처리 중" : "추가금 완료"}
+                        </button>
+                      )}
                       <ChevronDown className="h-4 w-4 text-slate-400" />
                     </div>
                   </div>
@@ -1935,7 +1983,7 @@ export default function CalendarPage() {
                         {res.roomName.replace(/^머무룸/, "")}
                       </span>
                       <span className="relative hidden pr-2 md:inline-flex">
-                        <strong className={cn("text-sm", isCancelled ? "text-slate-500 line-through" : "text-slate-900")}>
+                        <strong className={cn("text-sm", isCancellationOnly ? "text-slate-500 line-through" : "text-slate-900")}>
                           {res.customerName}
                         </strong>
                         {reviewBadge && (
@@ -1975,7 +2023,8 @@ export default function CalendarPage() {
                             ? "bg-emerald-50 text-emerald-600 border-emerald-200" 
                             : "bg-rose-50 text-rose-600 border-rose-300 shadow-sm shadow-rose-100"
                         )}>
-                          추가금 {res.usageLog.extraPaymentMethod ? `(${res.usageLog.extraPaymentMethod})` : ""}{!res.usageLog.isExtraPaid && " 미결제★"}
+                          {res.usageLog.isExtraPaid ? "추가금 결제완료" : "추가금 미결제★"}
+                          {res.usageLog.extraPaymentMethod ? ` (${res.usageLog.extraPaymentMethod})` : ""}
                         </span>
                       )}
                       {res.timeLocked && (
@@ -1997,7 +2046,7 @@ export default function CalendarPage() {
                       {res.price > 0 && (
                         <p className="flex min-w-0 items-center gap-1 text-slate-700">
                           <Wallet className="h-3.5 w-3.5 shrink-0 text-slate-400" />
-                          <span>{isCancelled ? "수수료" : "요금"}: <strong className="text-slate-800">{res.price.toLocaleString()}원</strong></span>
+                          <span>{isNoShow ? "노쇼 수수료" : isCancellationOnly ? "수수료" : "요금"}: <strong className="text-slate-800">{res.price.toLocaleString()}원</strong></span>
                         </p>
                       )}
                       {hasDepositBalance && (
@@ -2011,7 +2060,7 @@ export default function CalendarPage() {
                           <PhoneActionLink
                             phone={res.phone}
                             contactName={res.customerName}
-                            cancelled={isCancelled}
+                            cancelled={isCancellationOnly}
                           />
                           {res.phoneLocked && (
                             <span className="rounded bg-amber-50 px-1.5 py-0.5 text-[10px] font-bold text-amber-700 ring-1 ring-amber-200">
@@ -2048,6 +2097,21 @@ export default function CalendarPage() {
                         title="결제완료로 변경"
                       >
                         결제완료 처리
+                      </button>
+                    )}
+                    {hasUnpaidExtra && (
+                      <button
+                        type="button"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          void handleMarkExtraPaid(res.id);
+                        }}
+                        onDoubleClick={(event) => event.stopPropagation()}
+                        disabled={updatingExtraPaymentId === res.id}
+                        className="rounded-lg bg-emerald-600 px-2.5 py-1.5 text-[11px] font-bold text-white transition hover:bg-emerald-700 active:scale-95 disabled:cursor-wait disabled:opacity-60 whitespace-nowrap"
+                        title="추가금을 결제완료로 변경"
+                      >
+                        {updatingExtraPaymentId === res.id ? "처리 중" : "추가금 결제완료"}
                       </button>
                     )}
                     <div className="flex w-full flex-wrap items-center justify-end gap-1 sm:w-auto sm:flex-nowrap">

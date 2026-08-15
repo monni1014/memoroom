@@ -93,9 +93,13 @@ export default function TodayReservationsList({ events }: { events: any[] }) {
         }
 
         const isCancelled = res.status === "CANCELLED";
+        const isNoShow = isCancelled && Boolean(res.isNoShow);
+        const isCancellationOnly = isCancelled && !isNoShow;
         const isCancelledToday = res.dashboardEventType === "CANCELLED_TODAY";
-        const borderColors = isCancelled
-          ? "border-l-slate-300"
+        const borderColors = isNoShow
+          ? "border-l-orange-400"
+          : isCancellationOnly
+            ? "border-l-slate-300"
           : res.source === "naver" ? "border-l-green-500" :
             res.source === "spacecloud" ? "border-l-indigo-500" : "border-l-amber-500";
         const labelColors =
@@ -114,16 +118,16 @@ export default function TodayReservationsList({ events }: { events: any[] }) {
               router.push(`/calendar?date=${dateStr}&focus=agenda`);
             }}
             title="더블클릭하면 해당 날짜의 예약 상세 목록으로 이동합니다"
-            className={`p-4 rounded-xl shadow-[0_2px_8px_rgba(0,0,0,0.02)] border flex justify-between items-center border-l-4 ${borderColors} ${isCancelled ? "bg-slate-100 border-slate-200" : "bg-white border-slate-100"} cursor-pointer select-none`}
+            className={`p-4 rounded-xl shadow-[0_2px_8px_rgba(0,0,0,0.02)] border flex justify-between items-center border-l-4 ${borderColors} ${isNoShow ? "bg-orange-50 border-orange-100" : isCancellationOnly ? "bg-slate-100 border-slate-200" : "bg-white border-slate-100"} cursor-pointer select-none`}
           >
             <div>
-              <p className={`text-sm font-semibold ${isCancelled ? "text-slate-400 line-through" : "text-slate-900"}`}>
+              <p className={`text-sm font-semibold ${isCancellationOnly ? "text-slate-400 line-through" : "text-slate-900"}`}>
                 {formatTimeRange(new Date(res.startTime), new Date(res.endTime))}
               </p>
               <p className="text-xs text-slate-500 mt-1.5 flex items-center gap-1.5 flex-wrap">
                 {isCancelled && (
-                  <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-slate-200 text-slate-600">
-                    🚫 {isCancelledToday ? "오늘 취소" : "취소됨"}
+                  <span className={`px-1.5 py-0.5 rounded text-[10px] font-semibold ${isNoShow ? "border border-orange-300 bg-orange-100 text-orange-700" : "bg-slate-200 text-slate-600"}`}>
+                    {isNoShow ? "👻 노쇼" : `🚫 ${isCancelledToday ? "오늘 취소" : "취소됨"}`}
                   </span>
                 )}
                 <span className={`px-1.5 py-0.5 rounded text-[10px] font-semibold ${labelColors}`}>
@@ -137,7 +141,7 @@ export default function TodayReservationsList({ events }: { events: any[] }) {
                 <span className={`px-1.5 py-0.5 rounded text-[10px] font-semibold ${roomColors}`}>
                   {res.roomName}
                 </span>
-                <strong className={isCancelled ? "text-slate-500" : "text-slate-800"}>{res.customerName}</strong>
+                <strong className={isCancellationOnly ? "text-slate-500" : "text-slate-800"}>{res.customerName}</strong>
                 {!isCancelled && !res.isPaid && (
                   <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-rose-100 text-rose-600">
                     💸 미결제
@@ -146,8 +150,8 @@ export default function TodayReservationsList({ events }: { events: any[] }) {
                   <RpaStatusBadge memo={res.memo} createdAt={res.createdAt} updatedAt={res.updatedAt} />
                   <span>· {res.usageLog?.headCount || 0}명 ({res.usageLog?.purpose || UNCATEGORIZED_LABEL}{res.usageLog?.detail ? ` · ${res.usageLog.detail}` : ""})</span>
                 {res.price > 0 && (
-                  <span className={`font-medium ${isCancelled ? "text-slate-500" : "text-emerald-600"}`}>
-                    · {res.price.toLocaleString()}원{isCancelled ? " (수수료)" : ""}
+                  <span className={`font-medium ${isNoShow ? "text-orange-700" : isCancellationOnly ? "text-slate-500" : "text-emerald-600"}`}>
+                    · {res.price.toLocaleString()}원{isNoShow ? " (노쇼 수수료)" : isCancellationOnly ? " (수수료)" : ""}
                   </span>
                 )}
                 {!isCancelled && res.discount > 0 && (
